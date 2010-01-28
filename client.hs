@@ -5,10 +5,15 @@ import Command
 import Utils
 
 import Network.Socket
+import System.Directory
+import System.FilePath
 import System.IO
 
 remoteHost :: String
 remoteHost = "127.0.0.1"
+
+baseDir :: FilePath
+baseDir = "builds"
 
 main :: IO ()
 main = withSocketsDo $
@@ -34,18 +39,20 @@ getBuildInstructions h
           _ -> die ("Unexpected response code: " ++ show rc)
 
 runBuildInstructions :: BuildInstructions -> IO ()
-runBuildInstructions (bn, bss) = mapM_ (runBuildStep bn) bss
+runBuildInstructions (bn, bss) = do createDirectory (baseDir </> show bn)
+                                    mapM_ (runBuildStep bn) bss
 
 runBuildStep :: BuildNum -> (BuildStepNum, BuildStep) -> IO ()
-runBuildStep _ (_, bs)
+runBuildStep bn (bsn, bs)
  = do putStrLn ("Running " ++ show (bs_name bs))
-      (sOut, sErr, ec) <- run (bs_prog bs) (bs_args bs)
-      putStrLn "Got:"
-      putStrLn (show sOut)
-      putStrLn "Got:"
-      putStrLn (show sErr)
-      putStrLn "Got:"
-      putStrLn (show ec)
+      let prog = bs_prog bs
+          args = bs_args bs
+      (sOut, sErr, ec) <- run prog args
+      writeBinaryFile (baseDir </> show bn </> show bsn <.> "prog") (show prog)
+      writeBinaryFile (baseDir </> show bn </> show bsn <.> "args") (show args)
+      writeBinaryFile (baseDir </> show bn </> show bsn <.> "stdout") sOut
+      writeBinaryFile (baseDir </> show bn </> show bsn <.> "stderr") sErr
+      writeBinaryFile (baseDir </> show bn </> show bsn <.> "ec") (show ec)
 
 getResponseCode :: Handle -> IO Int
 getResponseCode h = do str <- hGetLine h

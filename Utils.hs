@@ -14,6 +14,9 @@ maybeRead str = case reads str of
                 [(x, "")] -> Just x
                 _ -> Nothing
 
+writeBinaryFile :: FilePath -> String -> IO ()
+writeBinaryFile fp str = withBinaryFile fp WriteMode (\h -> hPutStr h str)
+
 readSizedThing :: Read a => Handle -> IO a
 readSizedThing h
  = do sizeStr <- hGetLine h
