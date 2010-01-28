@@ -39,7 +39,7 @@ handleClient h = do talk
 buildStep :: BuildStep
 buildStep = BuildStep {
                 bs_name = "Test build step",
-                bs_command = "/bin/echo",
+                bs_prog = "/bin/echo",
                 bs_args = ["arg1", "arg2", "arg3"]
             }
 

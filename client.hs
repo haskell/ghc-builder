@@ -1,6 +1,7 @@
 module Main where
 
 import BuildStep
+import Command
 import Utils
 
 import Network.Socket
@@ -33,7 +34,14 @@ getBuildStep h
           _ -> die ("Unexpected response code: " ++ show rc)
 
 runBuildStep :: BuildStep -> IO ()
-runBuildStep bs = print bs
+runBuildStep bs = do putStrLn ("Running " ++ show (bs_name bs))
+                     (sOut, sErr, ec) <- run (bs_prog bs) (bs_args bs)
+                     putStrLn "Got:"
+                     putStrLn (show sOut)
+                     putStrLn "Got:"
+                     putStrLn (show sErr)
+                     putStrLn "Got:"
+                     putStrLn (show ec)
 
 getResponseCode :: Handle -> IO Int
 getResponseCode h = do str <- hGetLine h
