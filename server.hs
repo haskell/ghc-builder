@@ -1,8 +1,10 @@
 
 module Main where
 
+import BuildStep
+import Utils
+
 import Control.Concurrent
-import Control.Monad
 import Network.Socket
 import System.IO
 
@@ -25,10 +27,19 @@ handleClient :: Handle -> IO ()
 handleClient h = do talk
                     hClose h
     where talk :: IO ()
-          talk = do putStrLn "Getting"
-                    msg <- hGetLine h
-                    unless (null msg) $
-                        do hPutStrLn h msg
-                           talk
+          talk = do msg <- hGetLine h
+                    case msg of
+                        "BUILD INSTRUCTIONS" ->
+                            do hPutStrLn h "201 Instructions follow"
+                               sendSizedThing h buildStep
+                        _ ->
+                            hPutStrLn h "500 I don't understand"
+                    talk
 
+buildStep :: BuildStep
+buildStep = BuildStep {
+                bs_name = "Test build step",
+                bs_command = "/bin/echo",
+                bs_args = ["arg1", "arg2", "arg3"]
+            }
 

@@ -1,5 +1,8 @@
 module Main where
 
+import BuildStep
+import Utils
+
 import Network.Socket
 import System.IO
 
@@ -15,15 +18,28 @@ main = withSocketsDo $
        h <- socketToHandle sock ReadWriteMode
        hSetBuffering h LineBuffering
 
-       let sendMsg = do hPutStrLn h "Hello, world!"
-                        msg <- hGetLine h
-                        putStrLn ("Received " ++ msg)
-
-       sendMsg
-       sendMsg
-       sendMsg
-       sendMsg
-       sendMsg
+       bs <- getBuildStep h
+       runBuildStep bs
 
        hClose h
+
+getBuildStep :: Handle -> IO BuildStep
+getBuildStep h
+ = do hPutStrLn h "BUILD INSTRUCTIONS"
+      rc <- getResponseCode h
+      case rc of
+          201 ->
+              readSizedThing h
+          _ -> die ("Unexpected response code: " ++ show rc)
+
+runBuildStep :: BuildStep -> IO ()
+runBuildStep bs = print bs
+
+getResponseCode :: Handle -> IO Int
+getResponseCode h = do str <- hGetLine h
+                       case maybeRead $ takeWhile (' ' /=) str of
+                           Nothing ->
+                               die ("Bad response code line: " ++ show str)
+                           Just rc ->
+                               return rc
 
