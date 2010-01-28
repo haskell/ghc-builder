@@ -31,15 +31,21 @@ handleClient h = do talk
                     case msg of
                         "BUILD INSTRUCTIONS" ->
                             do hPutStrLn h "201 Instructions follow"
-                               sendSizedThing h buildStep
+                               sendSizedThing h buildInstructions
                         _ ->
                             hPutStrLn h "500 I don't understand"
                     talk
 
-buildStep :: BuildStep
-buildStep = BuildStep {
-                bs_name = "Test build step",
-                bs_prog = "/bin/echo",
-                bs_args = ["arg1", "arg2", "arg3"]
-            }
+buildInstructions :: BuildInstructions
+buildInstructions = (8, [(1, bs1), (2, bs2)])
+    where bs1 = BuildStep {
+                    bs_name = "Test build step",
+                    bs_prog = "/bin/echo",
+                    bs_args = ["arg1", "arg2", "arg3"]
+                }
+          bs2 = BuildStep {
+                    bs_name = "Test build step",
+                    bs_prog = "/bin/echo",
+                    bs_args = ["argx1", "argx2", "argx3"]
+                }
 

@@ -19,13 +19,13 @@ main = withSocketsDo $
        h <- socketToHandle sock ReadWriteMode
        hSetBuffering h LineBuffering
 
-       bs <- getBuildStep h
-       runBuildStep bs
+       bi <- getBuildInstructions h
+       runBuildInstructions bi
 
        hClose h
 
-getBuildStep :: Handle -> IO BuildStep
-getBuildStep h
+getBuildInstructions :: Handle -> IO BuildInstructions
+getBuildInstructions h
  = do hPutStrLn h "BUILD INSTRUCTIONS"
       rc <- getResponseCode h
       case rc of
@@ -33,15 +33,19 @@ getBuildStep h
               readSizedThing h
           _ -> die ("Unexpected response code: " ++ show rc)
 
-runBuildStep :: BuildStep -> IO ()
-runBuildStep bs = do putStrLn ("Running " ++ show (bs_name bs))
-                     (sOut, sErr, ec) <- run (bs_prog bs) (bs_args bs)
-                     putStrLn "Got:"
-                     putStrLn (show sOut)
-                     putStrLn "Got:"
-                     putStrLn (show sErr)
-                     putStrLn "Got:"
-                     putStrLn (show ec)
+runBuildInstructions :: BuildInstructions -> IO ()
+runBuildInstructions (bn, bss) = mapM_ (runBuildStep bn) bss
+
+runBuildStep :: BuildNum -> (BuildStepNum, BuildStep) -> IO ()
+runBuildStep _ (_, bs)
+ = do putStrLn ("Running " ++ show (bs_name bs))
+      (sOut, sErr, ec) <- run (bs_prog bs) (bs_args bs)
+      putStrLn "Got:"
+      putStrLn (show sOut)
+      putStrLn "Got:"
+      putStrLn (show sErr)
+      putStrLn "Got:"
+      putStrLn (show ec)
 
 getResponseCode :: Handle -> IO Int
 getResponseCode h = do str <- hGetLine h
