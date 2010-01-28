@@ -3,9 +3,7 @@ module Main where
 
 import Control.Concurrent
 import Control.Monad
-import qualified Data.ByteString as S
-import Network.Socket hiding (recv)
-import Network.Socket.ByteString
+import Network.Socket
 import System.IO
 
 main :: IO ()
