@@ -2,14 +2,15 @@
 module Utils where
 
 import Control.Monad
+import Control.Monad.Trans
 import qualified Data.ByteString.Lazy.Char8 as BS
 import System.Directory
 import System.Exit
 import System.IO
 
-die :: String -> IO a
-die msg = do hPutStrLn stderr msg
-             exitWith (ExitFailure 1)
+die :: MonadIO m => String -> m a
+die msg = liftIO $ do hPutStrLn stderr msg
+                      exitWith (ExitFailure 1)
 
 maybeRead :: Read a => String -> Maybe a
 maybeRead str = case reads str of
