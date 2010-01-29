@@ -4,6 +4,7 @@
 module Main where
 
 import BuildStep
+import Config
 import Utils
 
 import Control.Concurrent
@@ -176,23 +177,5 @@ receiveBuildStep c buildNum buildStepNum
       sendClient c "200 Got it, thanks!"
 
 mkBuildInstructions :: BuildNum -> BuildInstructions
-mkBuildInstructions bn = (bn, zip [1..] [bs1, bs2, bs3])
-    where bs1 = BuildStep {
-                    bs_name = "Test build step",
-                    bs_subdir = ".",
-                    bs_prog = "/bin/mkdir",
-                    bs_args = ["build"]
-                }
-          bs2 = BuildStep {
-                    bs_name = "Second test build step",
-                    bs_subdir = "build",
-                    bs_prog = "/bin/echo",
-                    bs_args = ["argx1", "argx2", "argx3"]
-                }
-          bs3 = BuildStep {
-                    bs_name = "Third test build step",
-                    bs_subdir = "build",
-                    bs_prog = "/bin/pwd",
-                    bs_args = []
-                }
+mkBuildInstructions bn = (bn, zip [1..] buildSteps)
 
