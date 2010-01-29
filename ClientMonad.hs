@@ -1,7 +1,9 @@
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module ClientMonad where
+module ClientMonad (ClientMonad, evalClientMonad, mkClientState,
+                    getVerbosity, getBaseDir, getHandle
+                   ) where
 
 import Utils
 
@@ -16,6 +18,14 @@ data ClientState = ClientState {
                        cs_basedir :: FilePath,
                        cs_handle :: Handle
                    }
+
+mkClientState :: Verbosity -> FilePath -> Handle -> ClientState
+mkClientState v bd h
+    = ClientState {
+          cs_verbosity = v,
+          cs_basedir = bd,
+          cs_handle = h
+      }
 
 evalClientMonad :: ClientMonad a -> ClientState -> IO a
 evalClientMonad (ClientMonad m) cs = evalStateT m cs

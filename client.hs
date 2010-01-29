@@ -46,11 +46,7 @@ runClient v =
        hSetBuffering h LineBuffering
 
        curDir <- getCurrentDirectory
-       let client = ClientState {
-                        cs_verbosity = v,
-                        cs_basedir = curDir </> baseSubDir,
-                        cs_handle = h
-                    }
+       let client = mkClientState v (curDir </> baseSubDir) h
        evalClientMonad doClient client
 
 doClient :: ClientMonad ()
@@ -76,7 +72,8 @@ mainLoop
       mainLoop
 
 sendServer :: String -> ClientMonad ()
-sendServer str = do liftIO $ when True $ -- XXX
+sendServer str = do v <- getVerbosity
+                    liftIO $ when (v >= Verbose) $
                         putStrLn ("Sending: " ++ show str)
                     h <- getHandle
                     liftIO $ hPutStrLn h str
