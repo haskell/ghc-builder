@@ -24,7 +24,8 @@ baseDir = "data"
 main :: IO ()
 main = do args <- getArgs
           case args of
-              []              -> withSocketsDo runServer
+              []              -> withSocketsDo $ runServer Normal
+              ["-v"]          -> withSocketsDo $ runServer Verbose
               ["init"]        -> initServer
               ["add", client] -> addClient client
               _               -> die "Bad args"
@@ -50,54 +51,53 @@ addClient client
                               (0 :: BuildNum)
                   putStrLn "OK, client added"
 
-runServer :: IO ()
-runServer =
+runServer :: Verbosity -> IO ()
+runServer v =
     do addrinfos <- getAddrInfo Nothing Nothing (Just "3000")
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
-               (listenForClients serveraddr)
+               (listenForClients v serveraddr)
 
-listenForClients :: AddrInfo -> Socket -> IO ()
-listenForClients serveraddr sock
+listenForClients :: Verbosity -> AddrInfo -> Socket -> IO ()
+listenForClients v serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let mainLoop = do (conn, _) <- accept sock
                         h <- socketToHandle conn ReadWriteMode
                         hSetBuffering h LineBuffering
-                        forkIO $ authClient h
+                        forkIO $ authClient v h
                         mainLoop
       mainLoop
 
-authClient :: Handle -> IO ()
-authClient h = do msg <- hGetLine h
-                  when True $ -- XXX (v >= Verbose) $
-                      putStrLn ("Received: " ++ show msg)
-                  case stripPrefix "AUTH " msg of
-                      Just xs ->
-                          case break (' ' ==) xs of
-                              (user, ' ' : _pass) ->
-                                  -- XXX actually do authentication
-                                  do let client = Client {
-                                                      c_handle = h,
-                                                      c_user = user,
-                                                      -- XXX:
-                                                      c_verbosity = Verbose
-                                                  }
-                                     sendClient client "200 authenticated"
-                                     handleClient client
-                              _ ->
-                                  do hPutStrLn h "500 I don't understand"
-                                     authClient h
-                      Nothing ->
-                          case msg of
-                              "HELP" ->
-                                  -- XXX
-                                  do hPutStrLn h "500 I don't understand"
-                                     authClient h
-                              _ ->
-                                  do hPutStrLn h "500 I don't understand"
-                                     authClient h
+authClient :: Verbosity -> Handle -> IO ()
+authClient v h
+ = do msg <- hGetLine h
+      when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
+      case stripPrefix "AUTH " msg of
+          Just xs ->
+              case break (' ' ==) xs of
+                  (user, ' ' : _pass) ->
+                      -- XXX actually do authentication
+                      do let client = Client {
+                                          c_handle = h,
+                                          c_user = user,
+                                          c_verbosity = v
+                                      }
+                         sendClient client "200 authenticated"
+                         handleClient client
+                  _ ->
+                      do hPutStrLn h "500 I don't understand"
+                         authClient v h
+          Nothing ->
+              case msg of
+                  "HELP" ->
+                      -- XXX
+                      do hPutStrLn h "500 I don't understand"
+                         authClient v h
+                  _ ->
+                      do hPutStrLn h "500 I don't understand"
+                         authClient v h
 
 data Client = Client {
                   c_handle :: Handle,
