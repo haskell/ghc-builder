@@ -1,15 +1,55 @@
 
+{-# LANGUAGE PatternGuards #-}
+
 module Main where
 
 import BuildStep
 import Utils
 
 import Control.Concurrent
+import Data.Char
+import Data.List
 import Network.Socket
+import System.Directory
+import System.Environment
+import System.Exit
+import System.FilePath
 import System.IO
 
+baseDir :: FilePath
+baseDir = "data"
+
 main :: IO ()
-main = withSocketsDo $
+main = do args <- getArgs
+          case args of
+              []              -> withSocketsDo runServer
+              ["init"]        -> initServer
+              ["add", client] -> addClient client
+              _               -> die "Bad args"
+
+initServer :: IO ()
+initServer = do -- XXX We really ought to catch an already-exists
+                -- exception and handle it properly
+                createDirectory baseDir
+                createDirectory (baseDir </> "clients")
+
+addClient :: String -> IO ()
+addClient client
+ | null client = die "Null client name!"
+ | not (all isAlpha client) = die "Bad client name"
+ | otherwise = do -- XXX We really ought to catch an already-exists
+                  -- exception and handle it properly
+                  let clientDir = baseDir </> "clients" </> client
+                  createDirectory clientDir
+                  createDirectory (clientDir </> "builds")
+                  writeToFile (clientDir </> "last_build_step_uploaded")
+                              (0 :: BuildNum, 0 :: BuildStepNum)
+                  writeToFile (clientDir </> "last_build_num_allocated")
+                              (0 :: BuildNum)
+                  putStrLn "OK, client added"
+
+runServer :: IO ()
+runServer =
     do addrinfos <- getAddrInfo Nothing Nothing (Just "3000")
        let serveraddr = head addrinfos
        sock <- socket (addrFamily serveraddr) Stream defaultProtocol
@@ -17,24 +57,98 @@ main = withSocketsDo $
        listen sock 1
        let mainLoop = do (conn, _) <- accept sock
                          h <- socketToHandle conn ReadWriteMode
-                         forkIO $ handleClient h
+                         forkIO $ authClient h
                          hSetBuffering h LineBuffering
                          mainLoop
        mainLoop
        sClose sock
 
-handleClient :: Handle -> IO ()
-handleClient h = do talk
-                    hClose h
-    where talk :: IO ()
+authClient :: Handle -> IO ()
+authClient h = do msg <- hGetLine h
+                  case stripPrefix "AUTH " msg of
+                      Just xs ->
+                          case break (' ' ==) xs of
+                              (user, ' ' : _pass) ->
+                                  -- XXX actually do authentication
+                                  let client = Client {
+                                                   c_handle = h,
+                                                   c_user = user
+                                               }
+                                  in handleClient client
+                              _ ->
+                                  do hPutStrLn h "500 I don't understand"
+                                     authClient h
+                      Nothing ->
+                          case msg of
+                              "HELP" ->
+                                  -- XXX
+                                  do hPutStrLn h "500 I don't understand"
+                                     authClient h
+                              _ ->
+                                  do hPutStrLn h "500 I don't understand"
+                                     authClient h
+
+data Client = Client {
+                  c_handle :: Handle,
+                  c_user :: String
+              }
+
+handleClient :: Client -> IO ()
+handleClient c = do talk
+                    handleClient c
+    where h = c_handle c
+          talk :: IO ()
           talk = do msg <- hGetLine h
                     case msg of
+                        -- XXX "HELP"
                         "BUILD INSTRUCTIONS" ->
                             do hPutStrLn h "201 Instructions follow"
                                sendSizedThing h buildInstructions
-                        _ ->
+                        _
+                         | Just xs <- stripPrefix "UPLOAD " msg,
+                           (ys, ' ' : zs) <- break (' ' ==) xs,
+                           Just buildNum <- maybeRead ys,
+                           Just buildStepNum <- maybeRead zs ->
+                            receiveBuildStep c buildNum buildStepNum
+                         | otherwise ->
                             hPutStrLn h "500 I don't understand"
                     talk
+
+receiveBuildStep :: Client -> BuildNum -> BuildStepNum -> IO ()
+receiveBuildStep c buildNum buildStepNum
+ = do let h = c_handle c
+          userDir = baseDir </> "clients" </> c_user c
+          buildDir = userDir </> show buildNum
+          buildStepDir = buildDir </> show buildStepNum
+      createDirectoryIfMissing False buildDir
+      -- Get the program
+      hPutStrLn h "203 Send program"
+      prog <- readSizedThing h
+      writeBinaryFile (buildStepDir </> "prog") (show (prog :: String))
+      -- Get the args
+      hPutStrLn h "203 Send args"
+      args <- readSizedThing h
+      writeBinaryFile (buildStepDir </> "args") (show (args :: [String]))
+      -- Get the exit code
+      hPutStrLn h "203 Send exit code"
+      ec <- readSizedThing h
+      writeBinaryFile (buildStepDir </> "exitcode") (show (ec :: ExitCode))
+      -- Get the stdout
+      hPutStrLn h "203 Send stdout"
+      sOut <- getSizedThing h
+      writeBinaryFile (buildStepDir </> "stdout") sOut
+      -- Get the stderr
+      hPutStrLn h "203 Send stderr"
+      sErr <- getSizedThing h
+      writeBinaryFile (buildStepDir </> "stderr") sErr
+      -- update the "last buildnum / buildstep received" counters
+      let lastFile = userDir </> "last_build_step_uploaded"
+      l <- readFromFile lastFile
+      let l' = l `max` (buildNum, buildStepNum)
+      writeToFile lastFile l'
+      -- and tell the client that we're done, so it can delete its copy
+      -- of the files
+      hPutStrLn h "200 Got it, thanks!"
 
 buildInstructions :: BuildInstructions
 buildInstructions = (8, [(1, bs1), (2, bs2)])
