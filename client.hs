@@ -43,13 +43,14 @@ runClient =
        authenticate h
        bi <- getBuildInstructions h
        runBuildInstructions bi
+       uploadBuildResults h (fst bi)
 
        -- XXX Kind of pointless, and won't work well once we do reconnection:
        hClose h
 
 mainLoop :: Handle -> IO ()
 mainLoop h
- = do hPutStrLn h "READY"
+ = do sendServer h "READY"
       rc <- getResponseCode h
       case rc of
           200 -> threadDelay (5 * 60 * 1000000)
@@ -62,13 +63,18 @@ mainLoop h
           _ -> die ("Unexpected response code: " ++ show rc)
       mainLoop h
 
+sendServer :: Handle -> String -> IO ()
+sendServer h str = do when True $ -- XXX
+                          putStrLn ("Sending: " ++ show str)
+                      hPutStrLn h str
+
 authenticate :: Handle -> IO ()
-authenticate h = do hPutStrLn h "AUTH foo mypass"
+authenticate h = do sendServer h "AUTH foo mypass"
                     getTheResponseCode 200 h
 
 getBuildInstructions :: Handle -> IO BuildInstructions
 getBuildInstructions h
- = do hPutStrLn h "BUILD INSTRUCTIONS"
+ = do sendServer h "BUILD INSTRUCTIONS"
       rc <- getResponseCode h
       case rc of
           201 ->
@@ -84,16 +90,18 @@ runBuildStep bn (bsn, bs)
  = do putStrLn ("Running " ++ show (bs_name bs))
       let prog = bs_prog bs
           args = bs_args bs
+          buildStepDir = baseDir </> show bn </> show bsn
       (sOut, sErr, ec) <- run prog args
-      writeBinaryFile (baseDir </> show bn </> show bsn </> "prog") (show prog)
-      writeBinaryFile (baseDir </> show bn </> show bsn </> "args") (show args)
-      writeBinaryFile (baseDir </> show bn </> show bsn </> "stdout") sOut
-      writeBinaryFile (baseDir </> show bn </> show bsn </> "stderr") sErr
-      writeBinaryFile (baseDir </> show bn </> show bsn </> "ec") (show ec)
+      createDirectory buildStepDir
+      writeBinaryFile (buildStepDir </> "prog") (show prog)
+      writeBinaryFile (buildStepDir </> "args") (show args)
+      writeBinaryFile (buildStepDir </> "stdout") sOut
+      writeBinaryFile (buildStepDir </> "stderr") sErr
+      writeBinaryFile (buildStepDir </> "exitcode") (show ec)
 
 uploadBuildResults :: Handle -> BuildNum -> IO ()
 uploadBuildResults h bn
- = do bsns <- getInterestingDirectoryContents buildDir
+ = do bsns <- getNumericDirectoryContents buildDir
       mapM_ sendStep $ sort bsns
       removeDirectory buildDir
     where buildDir = baseDir </> show bn
@@ -105,7 +113,7 @@ uploadBuildResults h bn
                        files = map (stepDir </>)
                                    ["prog", "args", "exitcode",
                                     "stdout", "stderr"]
-                   hPutStrLn h ("UPLOAD " ++ show bn ++ " " ++ show bsn)
+                   sendServer h ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendFile files
                    getTheResponseCode 200 h
                    mapM_ removeFile files

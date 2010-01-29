@@ -1,6 +1,7 @@
 
 module Utils where
 
+import Control.Monad
 import qualified Data.ByteString.Lazy.Char8 as BS
 import System.Directory
 import System.Exit
@@ -61,6 +62,18 @@ readFromFile fp = do xs <- readBinaryFile fp
 
 writeToFile :: Show a => FilePath -> a -> IO ()
 writeToFile fp x = writeBinaryFile fp (show x)
+
+getNumericDirectoryContents :: FilePath -> IO [Int]
+getNumericDirectoryContents fp = do xs <- getDirectoryContents fp
+                                    f xs
+    where f [] = return []
+          f ("." : xs) = f xs
+          f (".." : xs) = f xs
+          f (x : xs) = case maybeRead x of
+                       Nothing ->
+                           die ("Bad directory entry: " ++ show x)
+                       Just n ->
+                           liftM (n :) (f xs)
 
 getInterestingDirectoryContents :: FilePath -> IO [FilePath]
 getInterestingDirectoryContents fp = do xs <- getDirectoryContents fp
