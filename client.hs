@@ -23,6 +23,10 @@ remoteHost = "127.0.0.1"
 baseSubDir :: FilePath
 baseSubDir = "builds"
 
+getTempBuildDir :: ClientMonad FilePath
+getTempBuildDir = do dir <- getBaseDir
+                     return (dir </> "tempbuild")
+
 main :: IO ()
 main = do args <- getArgs
           case args of
@@ -93,12 +97,17 @@ runBuildInstructions :: BuildInstructions -> ClientMonad ()
 runBuildInstructions (bn, bss)
  = do baseDir <- getBaseDir
       liftIO $ createDirectory (baseDir </> show bn)
+      tempBuildDir <- getTempBuildDir
+      liftIO $ ignoreDoesNotExist $ removeDirectoryRecursive tempBuildDir
+      liftIO $ createDirectory tempBuildDir
       mapM_ (runBuildStep bn) bss
 
 runBuildStep :: BuildNum -> (BuildStepNum, BuildStep) -> ClientMonad ()
 runBuildStep bn (bsn, bs)
  = do liftIO $ putStrLn ("Running " ++ show (bs_name bs))
       baseDir <- getBaseDir
+      tempBuildDir <- getTempBuildDir
+      liftIO $ setCurrentDirectory (tempBuildDir </> bs_subdir bs)
       let prog = bs_prog bs
           args = bs_args bs
           buildStepDir = baseDir </> show bn </> show bsn

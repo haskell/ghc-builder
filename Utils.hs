@@ -1,12 +1,15 @@
 
 module Utils where
 
+import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
 import qualified Data.ByteString.Lazy.Char8 as BS
+import Prelude hiding (catch)
 import System.Directory
 import System.Exit
 import System.IO
+import System.IO.Error hiding (catch)
 
 data Verbosity = Silent | Normal | Verbose | Deafening
     deriving (Eq, Ord, Show, Read)
@@ -85,4 +88,8 @@ getInterestingDirectoryContents fp = do xs <- getDirectoryContents fp
     where interesting "."  = False
           interesting ".." = False
           interesting _    = True
+
+ignoreDoesNotExist :: IO () -> IO ()
+ignoreDoesNotExist io = io `catch` \e -> unless (isDoesNotExistError e)
+                                                (throwIO e)
 

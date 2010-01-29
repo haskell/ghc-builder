@@ -9,6 +9,7 @@ type BuildStepNum = Integer
 
 data BuildStep = BuildStep {
                      bs_name :: String,
+                     bs_subdir :: FilePath,
                      bs_prog :: FilePath,
                      bs_args :: [String]
                  }
