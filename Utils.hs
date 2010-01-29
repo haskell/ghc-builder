@@ -5,6 +5,8 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
 import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.Time.Clock
+import Data.Time.LocalTime
 import Prelude hiding (catch)
 import System.Directory
 import System.Exit
@@ -92,4 +94,8 @@ getInterestingDirectoryContents fp = do xs <- getDirectoryContents fp
 ignoreDoesNotExist :: IO () -> IO ()
 ignoreDoesNotExist io = io `catch` \e -> unless (isDoesNotExistError e)
                                                 (throwIO e)
+
+getTOD :: IO TimeOfDay
+getTOD = do t <- getCurrentTime
+            return $ timeToTimeOfDay $ utctDayTime t
 

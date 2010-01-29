@@ -54,11 +54,8 @@ runClient v =
        evalClientMonad doClient client
 
 doClient :: ClientMonad ()
-doClient
- = do authenticate
-      bi <- getBuildInstructions
-      runBuildInstructions bi
-      uploadBuildResults (fst bi)
+doClient = do authenticate
+              mainLoop
 
 mainLoop :: ClientMonad ()
 mainLoop

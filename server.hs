@@ -12,6 +12,7 @@ import Control.Exception
 import Control.Monad
 import Data.Char
 import Data.List
+import Data.Time.LocalTime
 import Network.Socket
 import System.Directory
 import System.Environment
@@ -80,10 +81,12 @@ authClient v h
               case break (' ' ==) xs of
                   (user, ' ' : _pass) ->
                       -- XXX actually do authentication
-                      do let client = Client {
+                      do tod <- getTOD
+                         let client = Client {
                                           c_handle = h,
                                           c_user = user,
-                                          c_verbosity = v
+                                          c_verbosity = v,
+                                          c_last_ready_time = tod
                                       }
                          sendClient client "200 authenticated"
                          handleClient client
@@ -103,7 +106,8 @@ authClient v h
 data Client = Client {
                   c_handle :: Handle,
                   c_user :: String,
-                  c_verbosity :: Verbosity
+                  c_verbosity :: Verbosity,
+                  c_last_ready_time :: TimeOfDay
               }
 
 sendClient :: Client -> String -> IO ()
@@ -129,6 +133,9 @@ handleClient c = do talk
                                let thisBuildNum = lastBuildNum + 1
                                writeToFile lastBuildNumFile thisBuildNum
                                sendSizedThing h $ mkBuildInstructions thisBuildNum
+                        "READY" ->
+                            -- XXX Should check times
+                            sendClient c "200 Nothing to do"
                         _
                          | Just xs <- stripPrefix "UPLOAD " msg,
                            (ys, ' ' : zs) <- break (' ' ==) xs,
@@ -178,4 +185,13 @@ receiveBuildStep c buildNum buildStepNum
 
 mkBuildInstructions :: BuildNum -> BuildInstructions
 mkBuildInstructions bn = (bn, zip [1..] buildSteps)
+
+scheduledTimePassed :: TimeOfDay -> TimeOfDay -> TimeOfDay -> Bool
+scheduledTimePassed lastTime curTime scheduledTime
+    = (lastTime < scheduledTime) &&
+      (-- the simple case, where the time has passed:
+       (curTime >= scheduledTime) ||
+       -- the tricky case, where the time has passed,
+       -- but then the clock has wrapped:
+       (curTime < lastTime))
 
