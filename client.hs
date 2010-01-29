@@ -26,7 +26,8 @@ baseSubDir = "builds"
 main :: IO ()
 main = do args <- getArgs
           case args of
-              []       -> withSocketsDo runClient
+              []       -> withSocketsDo $ runClient Normal
+              ["-v"]   -> withSocketsDo $ runClient Verbose
               ["init"] -> initClient
               _        -> die "Bad args"
 
@@ -35,8 +36,8 @@ initClient = do -- XXX We really ought to catch an already-exists
                 -- exception and handle it properly
                 createDirectory baseSubDir
 
-runClient :: IO ()
-runClient =
+runClient :: Verbosity -> IO ()
+runClient v =
     do addrinfos <- getAddrInfo Nothing (Just remoteHost) (Just "3000")
        let serveraddr = head addrinfos
        sock <- socket (addrFamily serveraddr) Stream defaultProtocol
@@ -46,6 +47,7 @@ runClient =
 
        curDir <- getCurrentDirectory
        let client = ClientState {
+                        cs_verbosity = v,
                         cs_basedir = curDir </> baseSubDir,
                         cs_handle = h
                     }

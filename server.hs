@@ -99,9 +99,6 @@ authClient h = do msg <- hGetLine h
                                   do hPutStrLn h "500 I don't understand"
                                      authClient h
 
-data Verbosity = Silent | Normal | Verbose | Deafening
-    deriving (Eq, Ord, Show, Read)
-
 data Client = Client {
                   c_handle :: Handle,
                   c_user :: String,
