@@ -4,6 +4,7 @@
 module Main where
 
 import BuildStep
+import ClientMonad
 import Command
 import Utils
 
@@ -28,25 +29,6 @@ main = do args <- getArgs
               []       -> withSocketsDo runClient
               ["init"] -> initClient
               _        -> die "Bad args"
-
-newtype ClientMonad a = ClientMonad (StateT ClientState IO a)
-    deriving (Monad, MonadIO)
-
-data ClientState = ClientState {
-                       cs_basedir :: FilePath,
-                       cs_handle :: Handle
-                   }
-
-evalClientMonad :: ClientMonad a -> ClientState -> IO a
-evalClientMonad (ClientMonad m) cs = evalStateT m cs
-
-getHandle :: ClientMonad Handle
-getHandle = do st <- ClientMonad get
-               return $ cs_handle st
-
-getBaseDir :: ClientMonad FilePath
-getBaseDir = do st <- ClientMonad get
-                return $ cs_basedir st
 
 initClient :: IO ()
 initClient = do -- XXX We really ought to catch an already-exists
