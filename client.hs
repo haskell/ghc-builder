@@ -14,6 +14,7 @@ import Data.List
 import Network.Socket
 import System.Directory
 import System.Environment
+import System.Exit
 import System.FilePath
 import System.IO
 
@@ -26,6 +27,10 @@ baseSubDir = "builds"
 getTempBuildDir :: ClientMonad FilePath
 getTempBuildDir = do dir <- getBaseDir
                      return (dir </> "tempbuild")
+
+getBuildResultFile :: BuildNum -> ClientMonad FilePath
+getBuildResultFile bn = do dir <- getBaseDir
+                           return (dir </> show bn </> "result")
 
 main :: IO ()
 main = do args <- getArgs
@@ -110,7 +115,19 @@ runBuildInstructions (bn, bss)
       liftIO $ createDirectory tempBuildDir
       mapM_ (runBuildStep bn) bss
 
-runBuildStep :: BuildNum -> (BuildStepNum, BuildStep) -> ClientMonad ()
+runBuildSteps :: BuildNum -> [(BuildStepNum, BuildStep)] -> ClientMonad ()
+runBuildSteps bn [] = do fp <- getBuildResultFile bn
+                         writeToFile fp Success
+runBuildSteps bn (step : steps)
+ = do ec <- runBuildStep bn step
+      case ec of
+          ExitSuccess ->
+              runBuildSteps bn steps
+          _ ->
+              do fp <- getBuildResultFile bn
+                 writeToFile fp Failure
+
+runBuildStep :: BuildNum -> (BuildStepNum, BuildStep) -> ClientMonad ExitCode
 runBuildStep bn (bsn, bs)
  = do liftIO $ putStrLn ("Running " ++ show (bs_name bs))
       baseDir <- getBaseDir
@@ -126,6 +143,7 @@ runBuildStep bn (bsn, bs)
       liftIO $ writeBinaryFile (buildStepDir </> "stdout") sOut
       liftIO $ writeBinaryFile (buildStepDir </> "stderr") sErr
       liftIO $ writeBinaryFile (buildStepDir </> "exitcode") (show ec)
+      return ec
 
 uploadBuildResults :: BuildNum -> ClientMonad ()
 uploadBuildResults bn

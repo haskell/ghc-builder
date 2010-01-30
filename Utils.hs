@@ -16,6 +16,9 @@ import System.IO.Error hiding (catch)
 data Verbosity = Silent | Normal | Verbose | Deafening
     deriving (Eq, Ord, Show, Read)
 
+data Result = Success | Failure
+    deriving (Eq, Ord, Show, Read)
+
 die :: MonadIO m => String -> m a
 die msg = liftIO $ do hPutStrLn stderr msg
                       exitWith (ExitFailure 1)
