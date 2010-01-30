@@ -134,8 +134,13 @@ handleClient = do talk
                                writeToFile lastBuildNumFile thisBuildNum
                                sendSizedThing h $ mkBuildInstructions thisBuildNum
                         "READY" ->
-                            -- XXX Should check times
-                            sendClient "200 Nothing to do"
+                            do prev <- getLastReadyTime
+                               current <- getTOD
+                               scheduled <- getScheduledBuildTime
+                               setLastReadyTime current
+                               if scheduledTimePassed prev current scheduled
+                                   then sendClient "202 Time for a build"
+                                   else sendClient "200 Nothing to do"
                         _
                          | Just xs <- stripPrefix "UPLOAD " msg,
                            (ys, ' ' : zs) <- break (' ' ==) xs,

@@ -96,8 +96,8 @@ ignoreDoesNotExist :: IO () -> IO ()
 ignoreDoesNotExist io = io `catch` \e -> unless (isDoesNotExistError e)
                                                 (throwIO e)
 
-getTOD :: IO TimeOfDay
-getTOD = do t <- getCurrentTime
+getTOD :: MonadIO m => m TimeOfDay
+getTOD = do t <- liftIO $ getCurrentTime
             return $ timeToTimeOfDay $ utctDayTime t
 
 mkTime :: Int -> Int -> TimeOfDay

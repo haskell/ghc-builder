@@ -3,7 +3,8 @@
 
 module ServerMonad (ServerMonad, evalServerMonad, mkServerState,
                     getVerbosity, getHandle, getUser,
-                    getLastReadyTime, setLastReadyTime
+                    getLastReadyTime, setLastReadyTime,
+                    getScheduledBuildTime
                    ) where
 
 import Data.Time.LocalTime
@@ -56,4 +57,8 @@ getLastReadyTime = do st <- ServerMonad get
 setLastReadyTime :: TimeOfDay -> ServerMonad ()
 setLastReadyTime tod = do st <- ServerMonad get
                           ServerMonad $ put $ st { ss_last_ready_time = tod }
+
+getScheduledBuildTime :: ServerMonad TimeOfDay
+getScheduledBuildTime = do st <- ServerMonad get
+                           return $ ss_scheduled_build_time st
 
