@@ -1,7 +1,8 @@
 
-module Config (buildSteps) where
+module Config (buildSteps, clients) where
 
 import BuildStep
+import Utils
 
 buildSteps :: [BuildStep]
 buildSteps = [BuildStep {
@@ -22,3 +23,7 @@ buildSteps = [BuildStep {
                   bs_prog = "/bin/pwd",
                   bs_args = []
               }]
+
+clients :: [(String, UserInfo)]
+clients = [("foo", mkUserInfo "mypass" (mkTime 2 0))]
+

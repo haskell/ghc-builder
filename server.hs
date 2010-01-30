@@ -81,12 +81,19 @@ authClient v h
       case stripPrefix "AUTH " msg of
           Just xs ->
               case break (' ' ==) xs of
-                  (user, ' ' : _pass) ->
-                      -- XXX actually do authentication
-                      do tod <- getTOD
-                         hPutStrLn h "200 authenticated"
-                         let serverState = mkServerState h user v tod
-                         evalServerMonad handleClient serverState
+                  (user, ' ' : pass) ->
+                      case lookup user clients of
+                      Just ui
+                       | ui_password ui == pass ->
+                          do tod <- getTOD
+                             hPutStrLn h "200 authenticated"
+                             let serverState = mkServerState
+                                                   h user v tod
+                                                   (ui_scheduleTime ui)
+                             evalServerMonad handleClient serverState
+                      _ ->
+                          do hPutStrLn h "501 auth failed"
+                             authClient v h
                   _ ->
                       do hPutStrLn h "500 I don't understand"
                          authClient v h

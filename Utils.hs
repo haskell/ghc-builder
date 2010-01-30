@@ -100,3 +100,21 @@ getTOD :: IO TimeOfDay
 getTOD = do t <- getCurrentTime
             return $ timeToTimeOfDay $ utctDayTime t
 
+mkTime :: Int -> Int -> TimeOfDay
+mkTime hour mins = TimeOfDay {
+                       todHour = hour,
+                       todMin = mins,
+                       todSec = 0
+                   }
+
+data UserInfo = UserInfo {
+                    ui_password :: String,
+                    ui_scheduleTime :: TimeOfDay
+                }
+
+mkUserInfo :: String -> TimeOfDay -> UserInfo
+mkUserInfo pass tod = UserInfo {
+                          ui_password = pass,
+                          ui_scheduleTime = tod
+                      }
+
