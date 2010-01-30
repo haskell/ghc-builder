@@ -63,14 +63,25 @@ mainLoop
       rc <- getResponseCode
       case rc of
           200 -> liftIO $ threadDelay (5 * 60 * 1000000)
-          202 -> do bi <- getBuildInstructions
-                    runBuildInstructions bi
-                    -- XXX We will arrange it such that everything is
-                    -- uploaded by the time we get here, so the build
-                    -- we've just done is the next one to be uploaded
-                    uploadBuildResults (fst bi)
+          202 -> doABuild
           _ -> die ("Unexpected response code: " ++ show rc)
       mainLoop
+
+doABuild :: ClientMonad ()
+doABuild = do bi <- getBuildInstructions
+              runBuildInstructions bi
+              -- XXX We will arrange it such that everything is
+              -- uploaded by the time we get here, so the build
+              -- we've just done is the next one to be uploaded
+              uploadBuildResults (fst bi)
+              -- We've just been doing stuff for a long time
+              -- potentially, so we could have overrun a scheduled
+              -- build by a long time. In that case, we don't want
+              -- to start a build hours late, so we tell the server
+              -- READY to reset the "last READY time", but we don't
+              -- start a build if it tells us we should
+              sendServer "READY"
+              getAResponseCode [200, 202]
 
 sendServer :: String -> ClientMonad ()
 sendServer str = do v <- getVerbosity
@@ -139,8 +150,11 @@ uploadBuildResults bn
       liftIO $ removeDirectory buildDir
 
 getTheResponseCode :: Int -> ClientMonad ()
-getTheResponseCode n = do rc <- getResponseCode
-                          unless (rc == n) $ die "Bad response code"
+getTheResponseCode n = getAResponseCode [n]
+
+getAResponseCode :: [Int] -> ClientMonad ()
+getAResponseCode ns = do rc <- getResponseCode
+                         unless (rc `elem` ns) $ die "Bad response code"
 
 getResponseCode :: ClientMonad Int
 getResponseCode = do h <- getHandle
