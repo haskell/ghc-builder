@@ -25,14 +25,15 @@ maybeRead str = case reads str of
                 [(x, "")] -> Just x
                 _ -> Nothing
 
-readBinaryFile :: FilePath -> IO String
-readBinaryFile fp = do h <- openBinaryFile fp ReadMode
-                       hGetContents h
+readBinaryFile :: MonadIO m => FilePath -> m String
+readBinaryFile fp = do h <- liftIO $ openBinaryFile fp ReadMode
+                       liftIO $ hGetContents h
 
-writeBinaryFile :: FilePath -> String -> IO ()
-writeBinaryFile fp str = withBinaryFile fp WriteMode (\h -> hPutStr h str)
+writeBinaryFile :: MonadIO m => FilePath -> String -> m ()
+writeBinaryFile fp str
+    = liftIO $ withBinaryFile fp WriteMode (\h -> hPutStr h str)
 
-readSizedThing :: Read a => Handle -> IO a
+readSizedThing :: (MonadIO m, Read a) => Handle -> m a
 readSizedThing h
  = do str <- getSizedThing h
       case maybeRead str of
@@ -41,27 +42,27 @@ readSizedThing h
           Just x ->
               return x
 
-sendSizedThing :: Show a => Handle -> a -> IO ()
+sendSizedThing :: (MonadIO m, Show a) => Handle -> a -> m ()
 sendSizedThing h x = putSizedThing h (show x)
 
-getSizedThing :: Handle -> IO String
+getSizedThing :: MonadIO m => Handle -> m String
 getSizedThing h
- = do sizeStr <- hGetLine h
+ = do sizeStr <- liftIO $ hGetLine h
       case maybeRead sizeStr of
           Nothing ->
               die ("Bad size: " ++ show sizeStr)
           Just size ->
-              do bs <- BS.hGet h size
-                 line <- hGetLine h
+              do bs <- liftIO $ BS.hGet h size
+                 line <- liftIO $ hGetLine h
                  if null line
                      then return $ BS.unpack bs
                      else die ("Stuff after data: " ++ show line)
 
-putSizedThing :: Handle -> String -> IO ()
-putSizedThing h str = do hPutStrLn h $ show $ length str
-                         hPutStrLn h str
+putSizedThing :: MonadIO m => Handle -> String -> m ()
+putSizedThing h str = do liftIO $ hPutStrLn h $ show $ length str
+                         liftIO $ hPutStrLn h str
 
-readFromFile :: Read a => FilePath -> IO a
+readFromFile :: (MonadIO m, Read a) => FilePath -> m a
 readFromFile fp = do xs <- readBinaryFile fp
                      case maybeRead xs of
                          Nothing ->
@@ -69,7 +70,7 @@ readFromFile fp = do xs <- readBinaryFile fp
                          Just x ->
                              return x
 
-writeToFile :: Show a => FilePath -> a -> IO ()
+writeToFile :: (MonadIO m, Show a) => FilePath -> a -> m ()
 writeToFile fp x = writeBinaryFile fp (show x)
 
 getNumericDirectoryContents :: FilePath -> IO [Int]

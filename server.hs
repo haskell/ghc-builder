@@ -5,11 +5,13 @@ module Main where
 
 import BuildStep
 import Config
+import ServerMonad
 import Utils
 
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans
 import Data.Char
 import Data.List
 import Data.Time.LocalTime
@@ -82,14 +84,9 @@ authClient v h
                   (user, ' ' : _pass) ->
                       -- XXX actually do authentication
                       do tod <- getTOD
-                         let client = Client {
-                                          c_handle = h,
-                                          c_user = user,
-                                          c_verbosity = v,
-                                          c_last_ready_time = tod
-                                      }
-                         sendClient client "200 authenticated"
-                         handleClient client
+                         hPutStrLn h "200 authenticated"
+                         let serverState = mkServerState h user v tod
+                         evalServerMonad handleClient serverState
                   _ ->
                       do hPutStrLn h "500 I don't understand"
                          authClient v h
@@ -103,75 +100,72 @@ authClient v h
                       do hPutStrLn h "500 I don't understand"
                          authClient v h
 
-data Client = Client {
-                  c_handle :: Handle,
-                  c_user :: String,
-                  c_verbosity :: Verbosity,
-                  c_last_ready_time :: TimeOfDay
-              }
+sendClient :: String -> ServerMonad ()
+sendClient str
+ = do v <- getVerbosity
+      h <- getHandle
+      liftIO $ when (v >= Verbose) $ putStrLn ("Sending: " ++ show str)
+      liftIO $ hPutStrLn h str
 
-sendClient :: Client -> String -> IO ()
-sendClient c str = do when (c_verbosity c >= Verbose) $
-                          putStrLn ("Sending: " ++ show str)
-                      hPutStrLn (c_handle c) str
-
-handleClient :: Client -> IO ()
-handleClient c = do talk
-                    handleClient c
-    where h = c_handle c
-          v = c_verbosity c
-          talk :: IO ()
-          talk = do msg <- hGetLine h
-                    when (v >= Verbose) $
+handleClient :: ServerMonad ()
+handleClient = do talk
+                  handleClient
+    where talk :: ServerMonad ()
+          talk = do h <- getHandle
+                    v <- getVerbosity
+                    msg <- liftIO $ hGetLine h
+                    liftIO $ when (v >= Verbose) $
                         putStrLn ("Received: " ++ show msg)
                     case msg of
                         -- XXX "HELP"
                         "BUILD INSTRUCTIONS" ->
-                            do sendClient c "201 Instructions follow"
-                               let lastBuildNumFile = baseDir </> "clients" </> c_user c </> "last_build_num_allocated"
+                            do sendClient "201 Instructions follow"
+                               user <- getUser
+                               let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_allocated"
                                lastBuildNum <- readFromFile lastBuildNumFile
                                let thisBuildNum = lastBuildNum + 1
                                writeToFile lastBuildNumFile thisBuildNum
                                sendSizedThing h $ mkBuildInstructions thisBuildNum
                         "READY" ->
                             -- XXX Should check times
-                            sendClient c "200 Nothing to do"
+                            sendClient "200 Nothing to do"
                         _
                          | Just xs <- stripPrefix "UPLOAD " msg,
                            (ys, ' ' : zs) <- break (' ' ==) xs,
                            Just buildNum <- maybeRead ys,
                            Just buildStepNum <- maybeRead zs ->
-                            receiveBuildStep c buildNum buildStepNum
+                            receiveBuildStep buildNum buildStepNum
                          | otherwise ->
-                            hPutStrLn h "500 I don't understand"
+                            liftIO $ hPutStrLn h "500 I don't understand"
                     talk
 
-receiveBuildStep :: Client -> BuildNum -> BuildStepNum -> IO ()
-receiveBuildStep c buildNum buildStepNum
- = do let h = c_handle c
-          userDir = baseDir </> "clients" </> c_user c
+receiveBuildStep :: BuildNum -> BuildStepNum -> ServerMonad ()
+receiveBuildStep buildNum buildStepNum
+ = do h <- getHandle
+      user <- getUser
+      let userDir = baseDir </> "clients" </> user
           buildDir = userDir </> show buildNum
           buildStepDir = buildDir </> show buildStepNum
-      createDirectoryIfMissing False buildDir
-      createDirectoryIfMissing False buildStepDir
+      liftIO $ createDirectoryIfMissing False buildDir
+      liftIO $ createDirectoryIfMissing False buildStepDir
       -- Get the program
-      sendClient c "203 Send program"
+      sendClient "203 Send program"
       prog <- readSizedThing h
       writeBinaryFile (buildStepDir </> "prog") (show (prog :: String))
       -- Get the args
-      sendClient c "203 Send args"
+      sendClient "203 Send args"
       args <- readSizedThing h
       writeBinaryFile (buildStepDir </> "args") (show (args :: [String]))
       -- Get the exit code
-      sendClient c "203 Send exit code"
+      sendClient "203 Send exit code"
       ec <- readSizedThing h
       writeBinaryFile (buildStepDir </> "exitcode") (show (ec :: ExitCode))
       -- Get the stdout
-      sendClient c "203 Send stdout"
+      sendClient "203 Send stdout"
       sOut <- getSizedThing h
       writeBinaryFile (buildStepDir </> "stdout") sOut
       -- Get the stderr
-      sendClient c "203 Send stderr"
+      sendClient "203 Send stderr"
       sErr <- getSizedThing h
       writeBinaryFile (buildStepDir </> "stderr") sErr
       -- update the "last buildnum / buildstep received" counters
@@ -181,7 +175,7 @@ receiveBuildStep c buildNum buildStepNum
       writeToFile lastFile l'
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
-      sendClient c "200 Got it, thanks!"
+      sendClient "200 Got it, thanks!"
 
 mkBuildInstructions :: BuildNum -> BuildInstructions
 mkBuildInstructions bn = (bn, zip [1..] buildSteps)
