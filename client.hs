@@ -110,6 +110,7 @@ runBuildInstructions :: BuildInstructions -> ClientMonad ()
 runBuildInstructions (bn, bss)
  = do baseDir <- getBaseDir
       liftIO $ createDirectory (baseDir </> show bn)
+      liftIO $ createDirectory (baseDir </> show bn </> "steps")
       tempBuildDir <- getTempBuildDir
       liftIO $ ignoreDoesNotExist $ removeDirectoryRecursive tempBuildDir
       liftIO $ createDirectory tempBuildDir
@@ -135,7 +136,7 @@ runBuildStep bn (bsn, bs)
       liftIO $ setCurrentDirectory (tempBuildDir </> bs_subdir bs)
       let prog = bs_prog bs
           args = bs_args bs
-          buildStepDir = baseDir </> show bn </> show bsn
+          buildStepDir = baseDir </> show bn </> "steps" </> show bsn
       (sOut, sErr, ec) <- liftIO $ run prog args
       liftIO $ createDirectory buildStepDir
       liftIO $ writeBinaryFile (buildStepDir </> "prog") (show prog)
@@ -148,10 +149,10 @@ runBuildStep bn (bsn, bs)
 uploadBuildResults :: BuildNum -> ClientMonad ()
 uploadBuildResults bn
  = do baseDir <- getBaseDir
+      h <- getHandle
       let buildDir = baseDir </> show bn
           sendStep bsn
-              = do h <- getHandle
-                   let stepDir = buildDir </> show bsn
+              = do let stepDir = buildDir </> show bsn
                        sendFile f = do getTheResponseCode 203
                                        xs <- liftIO $ readBinaryFile f
                                        liftIO $ putSizedThing h xs
@@ -165,6 +166,9 @@ uploadBuildResults bn
                    liftIO $ removeDirectory stepDir
       bsns <- liftIO $ getNumericDirectoryContents buildDir
       mapM_ sendStep $ sort bsns
+      sendServer ("RESULT " ++ show bn)
+      xs <- liftIO $ readBinaryFile (buildDir </> "result")
+      liftIO $ putSizedThing h xs
       liftIO $ removeDirectory buildDir
 
 getTheResponseCode :: Int -> ClientMonad ()

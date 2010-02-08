@@ -49,8 +49,8 @@ addClient client
                   let clientDir = baseDir </> "clients" </> client
                   createDirectory clientDir
                   createDirectory (clientDir </> "builds")
-                  writeToFile (clientDir </> "last_build_step_uploaded")
-                              (0 :: BuildNum, 0 :: BuildStepNum)
+                  writeToFile (clientDir </> "last_build_num_uploaded")
+                              (0 :: BuildNum)
                   writeToFile (clientDir </> "last_build_num_allocated")
                               (0 :: BuildNum)
                   putStrLn "OK, client added"
@@ -157,8 +157,10 @@ receiveBuildStep buildNum buildStepNum
       user <- getUser
       let userDir = baseDir </> "clients" </> user
           buildDir = userDir </> show buildNum
-          buildStepDir = buildDir </> show buildStepNum
+          stepsDir = buildDir </> "steps"
+          buildStepDir = stepsDir </> show buildStepNum
       liftIO $ createDirectoryIfMissing False buildDir
+      liftIO $ createDirectoryIfMissing False stepsDir
       liftIO $ createDirectoryIfMissing False buildStepDir
       -- Get the program
       sendClient "203 Send program"
@@ -180,11 +182,10 @@ receiveBuildStep buildNum buildStepNum
       sendClient "203 Send stderr"
       sErr <- getSizedThing h
       writeBinaryFile (buildStepDir </> "stderr") sErr
-      -- update the "last buildnum / buildstep received" counters
-      let lastFile = userDir </> "last_build_step_uploaded"
+      -- update the "last buildnum uploaded" record
+      let lastFile = userDir </> "last_build_num_uploaded"
       l <- readFromFile lastFile
-      let l' = l `max` (buildNum, buildStepNum)
-      writeToFile lastFile l'
+      when (buildNum > l) $ writeToFile lastFile buildNum
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
       sendClient "200 Got it, thanks!"
