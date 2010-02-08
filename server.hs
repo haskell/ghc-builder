@@ -86,33 +86,37 @@ authClient v h
                       Just ui
                        | ui_password ui == pass ->
                           do tod <- getTOD
-                             hPutStrLn h "200 authenticated"
+                             sendHandle v h "200 authenticated"
                              let serverState = mkServerState
                                                    h user v tod
                                                    (ui_buildTime ui)
                              evalServerMonad handleClient serverState
                       _ ->
-                          do hPutStrLn h "501 auth failed"
+                          do sendHandle v h "501 auth failed"
                              authClient v h
                   _ ->
-                      do hPutStrLn h "500 I don't understand"
+                      do sendHandle v h "500 I don't understand"
                          authClient v h
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
-                      do hPutStrLn h "500 I don't understand"
+                      do sendHandle v h "500 I don't understand"
                          authClient v h
                   _ ->
-                      do hPutStrLn h "500 I don't understand"
+                      do sendHandle v h "500 I don't understand"
                          authClient v h
+
+sendHandle :: Verbosity -> Handle -> String -> IO ()
+sendHandle v h str
+ = do when (v >= Verbose) $ putStrLn ("Sending: " ++ show str)
+      hPutStrLn h str
 
 sendClient :: String -> ServerMonad ()
 sendClient str
  = do v <- getVerbosity
       h <- getHandle
-      liftIO $ when (v >= Verbose) $ putStrLn ("Sending: " ++ show str)
-      liftIO $ hPutStrLn h str
+      liftIO $ sendHandle v h str
 
 handleClient :: ServerMonad ()
 handleClient = do talk
@@ -133,6 +137,14 @@ handleClient = do talk
                                let thisBuildNum = lastBuildNum + 1
                                writeToFile lastBuildNumFile thisBuildNum
                                sendSizedThing h $ mkBuildInstructions thisBuildNum
+                               sendClient "200 That's it"
+                        "LAST UPLOADED" ->
+                            do sendClient "201 Build number follows"
+                               user <- getUser
+                               let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_uploaded"
+                               lastBuildNum <- readFromFile lastBuildNumFile
+                               sendSizedThing h (lastBuildNum :: BuildNum)
+                               sendClient "200 That's it"
                         "READY" ->
                             do
                                scheduled <- getScheduledBuildTime
@@ -156,7 +168,7 @@ handleClient = do talk
                            Just buildNum <- maybeRead xs ->
                             receiveBuildResult buildNum
                          | otherwise ->
-                            liftIO $ hPutStrLn h "500 I don't understand"
+                            sendClient "500 I don't understand"
                     talk
 
 receiveBuildStep :: BuildNum -> BuildStepNum -> ServerMonad ()

@@ -76,7 +76,7 @@ readFromFile fp = do xs <- readBinaryFile fp
 writeToFile :: (MonadIO m, Show a) => FilePath -> a -> m ()
 writeToFile fp x = writeBinaryFile fp (show x)
 
-getNumericDirectoryContents :: FilePath -> IO [Int]
+getNumericDirectoryContents :: FilePath -> IO [Integer]
 getNumericDirectoryContents fp = do xs <- getDirectoryContents fp
                                     f xs
     where f [] = return []

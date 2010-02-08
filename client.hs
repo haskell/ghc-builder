@@ -22,7 +22,7 @@ remoteHost :: String
 remoteHost = "127.0.0.1"
 
 baseSubDir :: FilePath
-baseSubDir = "builds"
+baseSubDir = "builder"
 
 getTempBuildDir :: ClientMonad FilePath
 getTempBuildDir = do dir <- getBaseDir
@@ -47,6 +47,7 @@ initClient user pass
  = do -- XXX We really ought to catch an already-exists
       -- exception and handle it properly
       createDirectory baseSubDir
+      createDirectory (baseSubDir </> "builds")
       writeBinaryFile "user" user
       writeBinaryFile "pass" pass
 
@@ -65,6 +66,7 @@ runClient v =
 
 doClient :: ClientMonad ()
 doClient = do authenticate
+              uploadAllBuildResults
               mainLoop
 
 mainLoop :: ClientMonad ()
@@ -111,12 +113,14 @@ getBuildInstructions
  = do sendServer "BUILD INSTRUCTIONS"
       getTheResponseCode 201
       h <- getHandle
-      liftIO $ readSizedThing h
+      bi <- liftIO $ readSizedThing h
+      getTheResponseCode 200
+      return bi
 
 runBuildInstructions :: BuildInstructions -> ClientMonad ()
 runBuildInstructions (bn, bss)
  = do baseDir <- getBaseDir
-      let buildDir = baseDir </> show bn
+      let buildDir = baseDir </> "builds" </> show bn
       liftIO $ createDirectory buildDir
       liftIO $ writeToFile (buildDir </> "result") Incomplete
       liftIO $ createDirectory (buildDir </> "steps")
@@ -145,7 +149,7 @@ runBuildStep bn (bsn, bs)
       liftIO $ setCurrentDirectory (tempBuildDir </> bs_subdir bs)
       let prog = bs_prog bs
           args = bs_args bs
-          buildStepDir = baseDir </> show bn </> "steps" </> show bsn
+          buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
       (sOut, sErr, ec) <- liftIO $ run prog args
       liftIO $ createDirectory buildStepDir
       liftIO $ writeBinaryFile (buildStepDir </> "prog") (show prog)
@@ -155,11 +159,33 @@ runBuildStep bn (bsn, bs)
       liftIO $ writeBinaryFile (buildStepDir </> "exitcode") (show ec)
       return ec
 
+uploadAllBuildResults :: ClientMonad ()
+uploadAllBuildResults
+ = do baseDir <- getBaseDir
+      let buildsDir = baseDir </> "builds"
+      bns <- liftIO $ getNumericDirectoryContents buildsDir
+      unless (null bns) $
+          do sendServer "LAST UPLOADED"
+             getTheResponseCode 201
+             h <- getHandle
+             num <- liftIO $ readSizedThing h
+             getTheResponseCode 200
+             case span (<= num) (sort bns) of
+                 (ys, zs) ->
+                     do mapM_ removeBuildNum ys
+                        mapM_ uploadBuildResults zs
+
+removeBuildNum :: BuildNum -> ClientMonad ()
+removeBuildNum bn
+ = do baseDir <- getBaseDir
+      let buildDir = baseDir </> "builds" </> show bn
+      liftIO $ removeDirectoryRecursive buildDir
+
 uploadBuildResults :: BuildNum -> ClientMonad ()
 uploadBuildResults bn
  = do baseDir <- getBaseDir
       h <- getHandle
-      let buildDir = baseDir </> show bn
+      let buildDir = baseDir </> "builds" </> show bn
           stepsDir = buildDir </> "steps"
           sendFile f = do getTheResponseCode 203
                           xs <- liftIO $ readBinaryFile f
