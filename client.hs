@@ -116,8 +116,10 @@ getBuildInstructions
 runBuildInstructions :: BuildInstructions -> ClientMonad ()
 runBuildInstructions (bn, bss)
  = do baseDir <- getBaseDir
-      liftIO $ createDirectory (baseDir </> show bn)
-      liftIO $ createDirectory (baseDir </> show bn </> "steps")
+      let buildDir = baseDir </> show bn
+      liftIO $ createDirectory buildDir
+      liftIO $ writeToFile (buildDir </> "result") Incomplete
+      liftIO $ createDirectory (buildDir </> "steps")
       tempBuildDir <- getTempBuildDir
       liftIO $ ignoreDoesNotExist $ removeDirectoryRecursive tempBuildDir
       liftIO $ createDirectory tempBuildDir
@@ -158,11 +160,12 @@ uploadBuildResults bn
  = do baseDir <- getBaseDir
       h <- getHandle
       let buildDir = baseDir </> show bn
+          stepsDir = buildDir </> "steps"
+          sendFile f = do getTheResponseCode 203
+                          xs <- liftIO $ readBinaryFile f
+                          liftIO $ putSizedThing h xs
           sendStep bsn
-              = do let stepDir = buildDir </> show bsn
-                       sendFile f = do getTheResponseCode 203
-                                       xs <- liftIO $ readBinaryFile f
-                                       liftIO $ putSizedThing h xs
+              = do let stepDir = stepsDir </> show bsn
                        files = map (stepDir </>)
                                    ["prog", "args", "exitcode",
                                     "stdout", "stderr"]
@@ -171,11 +174,14 @@ uploadBuildResults bn
                    getTheResponseCode 200
                    liftIO $ mapM_ removeFile files
                    liftIO $ removeDirectory stepDir
-      bsns <- liftIO $ getNumericDirectoryContents buildDir
+      bsns <- liftIO $ getNumericDirectoryContents stepsDir
       mapM_ sendStep $ sort bsns
+      liftIO $ removeDirectory stepsDir
       sendServer ("RESULT " ++ show bn)
-      xs <- liftIO $ readBinaryFile (buildDir </> "result")
-      liftIO $ putSizedThing h xs
+      let resultFile = buildDir </> "result"
+      sendFile resultFile
+      getTheResponseCode 200
+      liftIO $ removeFile resultFile
       liftIO $ removeDirectory buildDir
 
 getTheResponseCode :: Int -> ClientMonad ()
@@ -187,7 +193,10 @@ getAResponseCode ns = do rc <- getResponseCode
 
 getResponseCode :: ClientMonad Int
 getResponseCode = do h <- getHandle
+                     v <- getVerbosity
                      str <- liftIO $ hGetLine h
+                     liftIO $ when (v >= Verbose) $
+                         putStrLn ("Received: " ++ show str)
                      case maybeRead $ takeWhile (' ' /=) str of
                          Nothing ->
                              die ("Bad response code line: " ++ show str)

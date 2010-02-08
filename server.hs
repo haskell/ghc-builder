@@ -152,6 +152,9 @@ handleClient = do talk
                            Just buildNum <- maybeRead ys,
                            Just buildStepNum <- maybeRead zs ->
                             receiveBuildStep buildNum buildStepNum
+                         | Just xs <- stripPrefix "RESULT " msg,
+                           Just buildNum <- maybeRead xs ->
+                            receiveBuildResult buildNum
                          | otherwise ->
                             liftIO $ hPutStrLn h "500 I don't understand"
                     talk
@@ -187,6 +190,21 @@ receiveBuildStep buildNum buildStepNum
       sendClient "203 Send stderr"
       sErr <- getSizedThing h
       writeBinaryFile (buildStepDir </> "stderr") sErr
+      -- and tell the client that we're done, so it can delete its copy
+      -- of the files
+      sendClient "200 Got it, thanks!"
+
+receiveBuildResult :: BuildNum -> ServerMonad ()
+receiveBuildResult buildNum
+ = do h <- getHandle
+      user <- getUser
+      let userDir = baseDir </> "clients" </> user
+          buildDir = userDir </> show buildNum
+      liftIO $ createDirectoryIfMissing False buildDir
+      -- Get the program
+      sendClient "203 Send result"
+      res <- readSizedThing h
+      writeBinaryFile (buildDir </> "result") (show (res :: Result))
       -- update the "last buildnum uploaded" record
       let lastFile = userDir </> "last_build_num_uploaded"
       l <- readFromFile lastFile

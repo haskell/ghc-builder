@@ -16,7 +16,7 @@ import System.IO.Error hiding (catch)
 data Verbosity = Silent | Normal | Verbose | Deafening
     deriving (Eq, Ord, Show, Read)
 
-data Result = Success | Failure
+data Result = Success | Failure | Incomplete
     deriving (Eq, Ord, Show, Read)
 
 die :: MonadIO m => String -> m a
