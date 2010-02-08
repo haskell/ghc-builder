@@ -89,7 +89,7 @@ authClient v h
                              hPutStrLn h "200 authenticated"
                              let serverState = mkServerState
                                                    h user v tod
-                                                   (ui_scheduleTime ui)
+                                                   (ui_buildTime ui)
                              evalServerMonad handleClient serverState
                       _ ->
                           do hPutStrLn h "501 auth failed"
@@ -134,13 +134,18 @@ handleClient = do talk
                                writeToFile lastBuildNumFile thisBuildNum
                                sendSizedThing h $ mkBuildInstructions thisBuildNum
                         "READY" ->
-                            do prev <- getLastReadyTime
-                               current <- getTOD
+                            do
                                scheduled <- getScheduledBuildTime
-                               setLastReadyTime current
-                               if scheduledTimePassed prev current scheduled
-                                   then sendClient "202 Time for a build"
-                                   else sendClient "200 Nothing to do"
+                               case scheduled of
+                                   Continuous ->
+                                       sendClient "202 Time for a build"
+                                   Timed tod ->
+                                       do prev <- getLastReadyTime
+                                          current <- getTOD
+                                          setLastReadyTime current
+                                          if scheduledTimePassed prev current tod
+                                              then sendClient "202 Time for a build"
+                                              else sendClient "200 Nothing to do"
                         _
                          | Just xs <- stripPrefix "UPLOAD " msg,
                            (ys, ' ' : zs) <- break (' ' ==) xs,

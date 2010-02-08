@@ -25,5 +25,6 @@ buildSteps = [BuildStep {
               }]
 
 clients :: [(String, UserInfo)]
-clients = [("foo", mkUserInfo "mypass" (mkTime 2 0))]
+clients = [("foo", mkUserInfo "mypass" (Timed (mkTime 2 0))),
+           ("bar", mkUserInfo "mypass" Continuous)]
 

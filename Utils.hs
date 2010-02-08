@@ -112,12 +112,15 @@ mkTime hour mins = TimeOfDay {
 
 data UserInfo = UserInfo {
                     ui_password :: String,
-                    ui_scheduleTime :: TimeOfDay
+                    ui_buildTime :: BuildTime
                 }
 
-mkUserInfo :: String -> TimeOfDay -> UserInfo
-mkUserInfo pass tod = UserInfo {
+data BuildTime = Timed TimeOfDay
+               | Continuous
+
+mkUserInfo :: String -> BuildTime -> UserInfo
+mkUserInfo pass bt = UserInfo {
                           ui_password = pass,
-                          ui_scheduleTime = tod
+                          ui_buildTime = bt
                       }
 

@@ -21,18 +21,18 @@ data ServerState = ServerState {
                        ss_user :: String,
                        ss_verbosity :: Verbosity,
                        ss_last_ready_time :: TimeOfDay,
-                       ss_scheduled_build_time :: TimeOfDay
+                       ss_scheduled_build_time :: BuildTime
                    }
 
-mkServerState :: Handle -> String -> Verbosity -> TimeOfDay -> TimeOfDay
+mkServerState :: Handle -> String -> Verbosity -> TimeOfDay -> BuildTime
               -> ServerState
-mkServerState h u v lrt sbt
+mkServerState h u v lrt bt
     = ServerState {
           ss_handle = h,
           ss_user = u,
           ss_verbosity = v,
           ss_last_ready_time = lrt,
-          ss_scheduled_build_time = sbt
+          ss_scheduled_build_time = bt
       }
 
 evalServerMonad :: ServerMonad a -> ServerState -> IO a
@@ -58,7 +58,7 @@ setLastReadyTime :: TimeOfDay -> ServerMonad ()
 setLastReadyTime tod = do st <- ServerMonad get
                           ServerMonad $ put $ st { ss_last_ready_time = tod }
 
-getScheduledBuildTime :: ServerMonad TimeOfDay
+getScheduledBuildTime :: ServerMonad BuildTime
 getScheduledBuildTime = do st <- ServerMonad get
                            return $ ss_scheduled_build_time st
 
