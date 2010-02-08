@@ -37,13 +37,18 @@ main = do args <- getArgs
           case args of
               []       -> withSocketsDo $ runClient Normal
               ["-v"]   -> withSocketsDo $ runClient Verbose
-              ["init"] -> initClient
+              -- XXX user and pass oughtn't really be given on the
+              -- commandline, but hey
+              ["init", user, pass] -> initClient user pass
               _        -> die "Bad args"
 
-initClient :: IO ()
-initClient = do -- XXX We really ought to catch an already-exists
-                -- exception and handle it properly
-                createDirectory baseSubDir
+initClient :: String -> String -> IO ()
+initClient user pass
+ = do -- XXX We really ought to catch an already-exists
+      -- exception and handle it properly
+      createDirectory baseSubDir
+      writeBinaryFile "user" user
+      writeBinaryFile "pass" pass
 
 runClient :: Verbosity -> IO ()
 runClient v =
@@ -96,7 +101,9 @@ sendServer str = do v <- getVerbosity
                     liftIO $ hPutStrLn h str
 
 authenticate :: ClientMonad ()
-authenticate = do sendServer "AUTH foo mypass"
+authenticate = do user <- readBinaryFile "user"
+                  pass <- readBinaryFile "pass"
+                  sendServer ("AUTH " ++ user ++ " " ++ pass)
                   getTheResponseCode 200
 
 getBuildInstructions :: ClientMonad BuildInstructions
