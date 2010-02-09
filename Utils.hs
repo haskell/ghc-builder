@@ -5,6 +5,7 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
 import qualified Data.ByteString.Lazy.Char8 as BS
+import Data.List
 import Data.Time.Clock
 import Data.Time.LocalTime
 import Prelude hiding (catch)
@@ -78,6 +79,10 @@ readFromFile fp = do xs <- readBinaryFile fp
 
 writeToFile :: (MonadIO m, Show a) => FilePath -> a -> m ()
 writeToFile fp x = writeBinaryFile fp (show x)
+
+getSortedNumericDirectoryContents :: FilePath -> IO [Integer]
+getSortedNumericDirectoryContents fp
+    = liftM sort $ getNumericDirectoryContents fp
 
 getNumericDirectoryContents :: FilePath -> IO [Integer]
 getNumericDirectoryContents fp = do xs <- getDirectoryContents fp
