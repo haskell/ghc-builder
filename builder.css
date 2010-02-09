@@ -1,0 +1,22 @@
+
+body {
+    background-color: white;
+    color: black;
+}
+
+.stdout, .stderr {
+    border: solid #CCCCCC 1px;
+    margin: 0.5em;
+    padding: 0.2em;
+}
+
+.stderr {
+    color: red;
+}
+
+.summary, .result {
+    color: blue;
+    border: solid #CCCCCC 1px;
+    margin: 0.2em;
+    padding: 0.2em;
+}
