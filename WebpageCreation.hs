@@ -27,7 +27,7 @@ createWebPage u bn
       createDirectory webBuildDir
       mapM_ (mkStepPage u bn) steps
       mkBuildPage u bn steps
-      -- mkIndex
+      mkIndex u
 
 mkStepPage :: User -> BuildNum -> BuildStepNum -> IO ()
 mkStepPage u bn bsn
@@ -89,4 +89,8 @@ mkBuildPage u bn bsns
                            noHtml
           str = renderHtml html
       writeBinaryFile page str
+
+-- XXX This should do something:
+mkIndex :: User -> IO ()
+mkIndex _ = return ()
 
