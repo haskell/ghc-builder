@@ -13,6 +13,9 @@ import System.Exit
 import System.IO
 import System.IO.Error hiding (catch)
 
+type User = String
+type Pass = String
+
 data Verbosity = Silent | Normal | Verbose | Deafening
     deriving (Eq, Ord, Show, Read)
 

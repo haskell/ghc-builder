@@ -7,6 +7,7 @@ import BuildStep
 import Config
 import ServerMonad
 import Utils
+import WebpageCreation
 
 import Control.Concurrent
 import Control.Exception
@@ -21,9 +22,6 @@ import System.Environment
 import System.Exit
 import System.FilePath
 import System.IO
-
-baseDir :: FilePath
-baseDir = "data"
 
 main :: IO ()
 main = do args <- getArgs
@@ -53,29 +51,33 @@ addClient client
                               (0 :: BuildNum)
                   writeToFile (clientDir </> "last_build_num_allocated")
                               (0 :: BuildNum)
+                  createDirectory (baseDir </> "web/builders" </> client)
                   putStrLn "OK, client added"
 
 runServer :: Verbosity -> IO ()
 runServer v =
-    do addrinfos <- getAddrInfo Nothing Nothing (Just "3000")
+    do webpageCreationVar <- newEmptyMVar
+       forkIO $ webpageCreator webpageCreationVar
+       addrinfos <- getAddrInfo Nothing Nothing (Just "3000")
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
-               (listenForClients v serveraddr)
+               (listenForClients v webpageCreationVar serveraddr)
 
-listenForClients :: Verbosity -> AddrInfo -> Socket -> IO ()
-listenForClients v serveraddr sock
+listenForClients :: Verbosity -> WCVar -> AddrInfo -> Socket
+                 -> IO ()
+listenForClients v mv serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let mainLoop = do (conn, _) <- accept sock
                         h <- socketToHandle conn ReadWriteMode
                         hSetBuffering h LineBuffering
-                        forkIO $ authClient v h
+                        forkIO $ authClient v h mv
                         mainLoop
       mainLoop
 
-authClient :: Verbosity -> Handle -> IO ()
-authClient v h
+authClient :: Verbosity -> Handle -> WCVar -> IO ()
+authClient v h mv
  = do msg <- hGetLine h
       when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
       case stripPrefix "AUTH " msg of
@@ -88,24 +90,24 @@ authClient v h
                           do tod <- getTOD
                              sendHandle v h "200 authenticated"
                              let serverState = mkServerState
-                                                   h user v tod
+                                                   h user v mv tod
                                                    (ui_buildTime ui)
                              evalServerMonad handleClient serverState
                       _ ->
                           do sendHandle v h "501 auth failed"
-                             authClient v h
+                             authClient v h mv
                   _ ->
                       do sendHandle v h "500 I don't understand"
-                         authClient v h
+                         authClient v h mv
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
                       do sendHandle v h "500 I don't understand"
-                         authClient v h
+                         authClient v h mv
                   _ ->
                       do sendHandle v h "500 I don't understand"
-                         authClient v h
+                         authClient v h mv
 
 sendHandle :: Verbosity -> Handle -> String -> IO ()
 sendHandle v h str
@@ -176,7 +178,7 @@ receiveBuildStep buildNum buildStepNum
  = do h <- getHandle
       user <- getUser
       let userDir = baseDir </> "clients" </> user
-          buildDir = userDir </> show buildNum
+          buildDir = userDir </> "builds" </> show buildNum
           stepsDir = buildDir </> "steps"
           buildStepDir = stepsDir </> show buildStepNum
       liftIO $ createDirectoryIfMissing False buildDir
@@ -223,6 +225,8 @@ receiveBuildResult buildNum
       when (buildNum > l) $ writeToFile lastFile buildNum
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
+      mv <- getWebpageCreatorVar
+      liftIO $ putMVar mv (user, buildNum)
       sendClient "200 Got it, thanks!"
 
 mkBuildInstructions :: BuildNum -> BuildInstructions
