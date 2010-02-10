@@ -17,6 +17,7 @@ import Data.Char
 import Data.List
 import Data.Time.LocalTime
 import Network.Socket
+import Prelude hiding (catch)
 import System.Directory
 import System.Environment
 import System.Exit
@@ -57,7 +58,12 @@ addClient client
 runServer :: Verbosity -> IO ()
 runServer v =
     do webpageCreationVar <- newEmptyMVar
-       forkIO $ webpageCreator webpageCreationVar
+       let webpageCreatorThread
+               = webpageCreator webpageCreationVar
+                 `catch` \e ->
+                     do verbose' v ("Webpage creation thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
+                        webpageCreatorThread
+       forkIO webpageCreatorThread
        addrinfos <- getAddrInfo Nothing Nothing (Just "3000")
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
@@ -109,9 +115,12 @@ authClient v h mv
                       do sendHandle v h "500 I don't understand"
                          authClient v h mv
 
+verbose' :: Verbosity -> String -> IO ()
+verbose' v str = when (v >= Verbose) $ putStrLn str
+
 sendHandle :: Verbosity -> Handle -> String -> IO ()
 sendHandle v h str
- = do when (v >= Verbose) $ putStrLn ("Sending: " ++ show str)
+ = do verbose' v ("Sending: " ++ show str)
       hPutStrLn h str
 
 sendClient :: String -> ServerMonad ()
