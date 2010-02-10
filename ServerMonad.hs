@@ -5,7 +5,7 @@ module ServerMonad (
                     ServerMonad, evalServerMonad, mkServerState,
                     getVerbosity, getHandle, getUser,
                     getLastReadyTime, setLastReadyTime,
-                    getScheduledBuildTime,
+                    getScheduledBuildTime, getBuildInstructions,
                     getWebpageCreatorVar,
                     -- XXX Don't really belong here:
                     WCVar,
@@ -34,20 +34,20 @@ data ServerState = ServerState {
                        ss_verbosity :: Verbosity,
                        ss_webpage_creation_var :: WCVar,
                        ss_last_ready_time :: TimeOfDay,
-                       ss_scheduled_build_time :: BuildTime
+                       ss_user_info :: UserInfo
                    }
 
 mkServerState :: Handle -> User -> Verbosity -> WCVar
-              -> TimeOfDay -> BuildTime
+              -> TimeOfDay -> UserInfo
               -> ServerState
-mkServerState h u v wcvar lrt bt
+mkServerState h u v wcvar lrt ui
     = ServerState {
           ss_handle = h,
           ss_user = u,
           ss_verbosity = v,
           ss_webpage_creation_var = wcvar,
           ss_last_ready_time = lrt,
-          ss_scheduled_build_time = bt
+          ss_user_info = ui
       }
 
 evalServerMonad :: ServerMonad a -> ServerState -> IO a
@@ -75,7 +75,11 @@ setLastReadyTime tod = do st <- ServerMonad get
 
 getScheduledBuildTime :: ServerMonad BuildTime
 getScheduledBuildTime = do st <- ServerMonad get
-                           return $ ss_scheduled_build_time st
+                           return $ ui_buildTime $ ss_user_info st
+
+getBuildInstructions :: ServerMonad [BuildStep]
+getBuildInstructions = do st <- ServerMonad get
+                          return $ ui_buildInstructions $ ss_user_info st
 
 getWebpageCreatorVar :: ServerMonad WCVar
 getWebpageCreatorVar = do st <- ServerMonad get

@@ -96,8 +96,7 @@ authClient v h mv
                           do tod <- getTOD
                              sendHandle v h "200 authenticated"
                              let serverState = mkServerState
-                                                   h user v mv tod
-                                                   (ui_buildTime ui)
+                                                   h user v mv tod ui
                              evalServerMonad handleClient serverState
                       _ ->
                           do sendHandle v h "501 auth failed"
@@ -147,7 +146,8 @@ handleClient = do talk
                                lastBuildNum <- readFromFile lastBuildNumFile
                                let thisBuildNum = lastBuildNum + 1
                                writeToFile lastBuildNumFile thisBuildNum
-                               sendSizedThing h $ mkBuildInstructions thisBuildNum
+                               bss <- getBuildInstructions
+                               sendSizedThing h $ mkBuildInstructions thisBuildNum bss
                                sendClient "200 That's it"
                         "LAST UPLOADED" ->
                             do sendClient "201 Build number follows"
@@ -238,8 +238,8 @@ receiveBuildResult buildNum
       liftIO $ putMVar mv (user, buildNum)
       sendClient "200 Got it, thanks!"
 
-mkBuildInstructions :: BuildNum -> BuildInstructions
-mkBuildInstructions bn = (bn, zip [1..] buildSteps)
+mkBuildInstructions :: BuildNum -> [BuildStep] -> BuildInstructions
+mkBuildInstructions bn buildSteps = (bn, zip [1..] buildSteps)
 
 scheduledTimePassed :: TimeOfDay -> TimeOfDay -> TimeOfDay -> Bool
 scheduledTimePassed lastTime curTime scheduledTime

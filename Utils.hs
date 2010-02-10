@@ -1,6 +1,8 @@
 
 module Utils where
 
+import BuildStep
+
 import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
@@ -130,15 +132,18 @@ mkTime hour mins = TimeOfDay {
 
 data UserInfo = UserInfo {
                     ui_password :: String,
-                    ui_buildTime :: BuildTime
+                    ui_buildTime :: BuildTime,
+                    ui_buildInstructions :: [BuildStep]
                 }
 
 data BuildTime = Timed TimeOfDay
                | Continuous
 
-mkUserInfo :: String -> BuildTime -> UserInfo
-mkUserInfo pass bt = UserInfo {
-                          ui_password = pass,
-                          ui_buildTime = bt
-                      }
+mkUserInfo :: String -> BuildTime -> [BuildStep] -> UserInfo
+mkUserInfo pass bt bis
+    = UserInfo {
+          ui_password = pass,
+          ui_buildTime = bt,
+          ui_buildInstructions = bis
+      }
 
