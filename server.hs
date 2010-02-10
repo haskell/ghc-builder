@@ -222,7 +222,7 @@ receiveBuildResult buildNum
  = do h <- getHandle
       user <- getUser
       let userDir = baseDir </> "clients" </> user
-          buildDir = userDir </> show buildNum
+          buildDir = userDir </> "builds" </> show buildNum
       liftIO $ createDirectoryIfMissing False buildDir
       -- Get the program
       sendClient "203 Send result"

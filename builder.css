@@ -22,6 +22,10 @@ body {
     background-color: red;
 }
 
+.incomplete {
+    background-color: yellow;
+}
+
 .summary, .result {
     color: blue;
     border: solid #CCCCCC 1px;

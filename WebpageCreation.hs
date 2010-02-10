@@ -76,12 +76,19 @@ mkBuildPage u bn bsns
                                              theclass linkClass])
                                      (stringToHtml (show bsn)))
       links <- mapM mkLink bsns
+      result <- readFromFile (buildDir </> "result")
+      let linkClass = case result of
+                      Success -> "success"
+                      Failure -> "failure"
+                      Incomplete -> "incomplete"
       let description = u ++ ", build " ++ show bn
           descriptionHtml = stringToHtml description
           html = header headerHtml
              +++ body bodyHtml
           bodyHtml = h1 descriptionHtml
                  +++ ulist (concatHtml (map li links))
+                 +++ (paragraph ! [theclass linkClass])
+                         (stringToHtml $ show result)
           headerHtml = thetitle descriptionHtml
                    +++ (thelink ! [rel "Stylesheet",
                                    thetype "text/css",
