@@ -12,6 +12,7 @@ import Control.Concurrent
 import Control.Monad.State
 import Data.List
 import Network.Socket
+import Prelude hiding (catch)
 import System.Directory
 import System.Environment
 import System.Exit
@@ -48,21 +49,33 @@ initClient user pass
       -- exception and handle it properly
       createDirectory baseSubDir
       createDirectory (baseSubDir </> "builds")
-      writeBinaryFile "user" user
-      writeBinaryFile "pass" pass
+      writeBinaryFile (baseSubDir </> "user") user
+      writeBinaryFile (baseSubDir </> "pass") pass
 
 runClient :: Verbosity -> IO ()
-runClient v =
-    do addrinfos <- getAddrInfo Nothing (Just remoteHost) (Just "3000")
-       let serveraddr = head addrinfos
-       sock <- socket (addrFamily serveraddr) Stream defaultProtocol
-       connect sock (addrAddress serveraddr)
-       h <- socketToHandle sock ReadWriteMode
-       hSetBuffering h LineBuffering
+runClient v = do curDir <- getCurrentDirectory
+                 connLoop curDir
+    where connLoop curDir
+              = do h <- conn 5
+                   verbose' v "Connected."
 
-       curDir <- getCurrentDirectory
-       let client = mkClientState v (curDir </> baseSubDir) h
-       evalClientMonad doClient client
+                   let client = mkClientState v (curDir </> baseSubDir) h
+                   evalClientMonad doClient client
+              `onEndOfFile` connLoop curDir
+
+          conn secs = do verbose' v "Connecting..."
+                         c `onDoesNotExist`
+                             do verbose' v ("Failed...sleeping for " ++ show secs ++ " seconds...")
+                                threadDelay (secs * 1000000)
+                                conn ((secs * 2) `min` 600)
+
+          c = do addrinfos <- getAddrInfo Nothing (Just remoteHost) (Just "3000")
+                 let serveraddr = head addrinfos
+                 sock <- socket (addrFamily serveraddr) Stream defaultProtocol
+                 connect sock (addrAddress serveraddr)
+                 h <- socketToHandle sock ReadWriteMode
+                 hSetBuffering h LineBuffering
+                 return h
 
 doClient :: ClientMonad ()
 doClient = do authenticate
@@ -95,16 +108,22 @@ doABuild = do bi <- getBuildInstructions
               sendServer "READY"
               getAResponseCode [200, 202]
 
+verbose :: String -> ClientMonad ()
+verbose str = do v <- getVerbosity
+                 liftIO $ verbose' v str
+
+verbose' :: Verbosity -> String -> IO ()
+verbose' v str = when (v >= Verbose) $ putStrLn str
+
 sendServer :: String -> ClientMonad ()
-sendServer str = do v <- getVerbosity
-                    liftIO $ when (v >= Verbose) $
-                        putStrLn ("Sending: " ++ show str)
+sendServer str = do verbose ("Sending: " ++ show str)
                     h <- getHandle
                     liftIO $ hPutStrLn h str
 
 authenticate :: ClientMonad ()
-authenticate = do user <- readBinaryFile "user"
-                  pass <- readBinaryFile "pass"
+authenticate = do dir <- getBaseDir
+                  user <- readBinaryFile (dir </> "user")
+                  pass <- readBinaryFile (dir </> "pass")
                   sendServer ("AUTH " ++ user ++ " " ++ pass)
                   getTheResponseCode 200
 

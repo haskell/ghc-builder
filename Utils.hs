@@ -107,6 +107,16 @@ ignoreDoesNotExist :: IO () -> IO ()
 ignoreDoesNotExist io = io `catch` \e -> unless (isDoesNotExistError e)
                                                 (throwIO e)
 
+onDoesNotExist :: IO a -> IO a -> IO a
+onDoesNotExist io io' = io `catch` \e -> if isDoesNotExistError e
+                                         then io'
+                                         else throwIO e
+
+onEndOfFile :: IO a -> IO a -> IO a
+onEndOfFile io io' = io `catch` \e -> if isEOFError e
+                                      then io'
+                                      else throwIO e
+
 getTOD :: MonadIO m => m TimeOfDay
 getTOD = do t <- liftIO $ getCurrentTime
             return $ timeToTimeOfDay $ utctDayTime t
