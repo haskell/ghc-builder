@@ -193,6 +193,14 @@ receiveBuildStep buildNum buildStepNum
       liftIO $ createDirectoryIfMissing False buildDir
       liftIO $ createDirectoryIfMissing False stepsDir
       liftIO $ createDirectoryIfMissing False buildStepDir
+      -- Get the name
+      sendClient "203 Send name"
+      name <- readSizedThing h
+      writeBinaryFile (buildStepDir </> "name") (show (name :: String))
+      -- Get the program
+      sendClient "203 Send subdir"
+      subdir <- readSizedThing h
+      writeBinaryFile (buildStepDir </> "subdir") (show (subdir :: FilePath))
       -- Get the program
       sendClient "203 Send program"
       prog <- readSizedThing h
@@ -205,14 +213,10 @@ receiveBuildStep buildNum buildStepNum
       sendClient "203 Send exit code"
       ec <- readSizedThing h
       writeBinaryFile (buildStepDir </> "exitcode") (show (ec :: ExitCode))
-      -- Get the stdout
-      sendClient "203 Send stdout"
-      sOut <- getSizedThing h
-      writeBinaryFile (buildStepDir </> "stdout") sOut
-      -- Get the stderr
-      sendClient "203 Send stderr"
-      sErr <- getSizedThing h
-      writeBinaryFile (buildStepDir </> "stderr") sErr
+      -- Get the output
+      sendClient "203 Send output"
+      output <- getSizedThing h
+      writeBinaryFile (buildStepDir </> "output") output
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
       sendClient "200 Got it, thanks!"

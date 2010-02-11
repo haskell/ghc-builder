@@ -35,7 +35,7 @@ clients = [("foo",
                        buildSteps),
            ("ghcBuilder",
             mkUserInfo "mypass"
-                       (Timed (mkTime 23 32))
+                       (Timed (mkTime 13 55))
                        ghcBuildSteps)
           ]
 

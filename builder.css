@@ -4,14 +4,22 @@ body {
     color: black;
 }
 
-.stdout, .stderr {
+.output {
     border: solid #CCCCCC 1px;
     margin: 0.5em;
     padding: 0.2em;
 }
 
+.stdout {
+    color: black;
+}
+
 .stderr {
     color: red;
+}
+
+.panic {
+    color: purple;
 }
 
 .success {

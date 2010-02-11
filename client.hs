@@ -31,7 +31,7 @@ getTempBuildDir = do dir <- getBaseDir
 
 getBuildResultFile :: BuildNum -> ClientMonad FilePath
 getBuildResultFile bn = do dir <- getBaseDir
-                           return (dir </> show bn </> "result")
+                           return (dir </> "builds" </> show bn </> "result")
 
 main :: IO ()
 main = do args <- getArgs
@@ -146,7 +146,7 @@ runBuildInstructions (bn, bss)
       tempBuildDir <- getTempBuildDir
       liftIO $ ignoreDoesNotExist $ removeDirectoryRecursive tempBuildDir
       liftIO $ createDirectory tempBuildDir
-      mapM_ (runBuildStep bn) bss
+      runBuildSteps bn bss
 
 runBuildSteps :: BuildNum -> [(BuildStepNum, BuildStep)] -> ClientMonad ()
 runBuildSteps bn [] = do fp <- getBuildResultFile bn
@@ -166,15 +166,17 @@ runBuildStep bn (bsn, bs)
       baseDir <- getBaseDir
       tempBuildDir <- getTempBuildDir
       liftIO $ setCurrentDirectory (tempBuildDir </> bs_subdir bs)
-      let prog = bs_prog bs
-          args = bs_args bs
+      let name   = bs_name   bs
+          subdir = bs_subdir bs
+          prog   = bs_prog   bs
+          args   = bs_args   bs
           buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
-      (sOut, sErr, ec) <- liftIO $ run prog args
       liftIO $ createDirectory buildStepDir
-      liftIO $ writeBinaryFile (buildStepDir </> "prog") (show prog)
-      liftIO $ writeBinaryFile (buildStepDir </> "args") (show args)
-      liftIO $ writeBinaryFile (buildStepDir </> "stdout") sOut
-      liftIO $ writeBinaryFile (buildStepDir </> "stderr") sErr
+      ec <- liftIO $ run prog args (buildStepDir </> "output")
+      liftIO $ writeBinaryFile (buildStepDir </> "name")     (show name)
+      liftIO $ writeBinaryFile (buildStepDir </> "subdir")   (show subdir)
+      liftIO $ writeBinaryFile (buildStepDir </> "prog")     (show prog)
+      liftIO $ writeBinaryFile (buildStepDir </> "args")     (show args)
       liftIO $ writeBinaryFile (buildStepDir </> "exitcode") (show ec)
       return ec
 
@@ -212,8 +214,8 @@ uploadBuildResults bn
           sendStep bsn
               = do let stepDir = stepsDir </> show bsn
                        files = map (stepDir </>)
-                                   ["prog", "args", "exitcode",
-                                    "stdout", "stderr"]
+                                   ["name", "subdir", "prog", "args",
+                                    "exitcode", "output"]
                    sendServer ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendFile files
                    getTheResponseCode 200

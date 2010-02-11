@@ -1,6 +1,8 @@
 
 module Command where
 
+import Utils
+
 import Control.Concurrent
 import Control.Concurrent.MVar
 import Control.Exception
@@ -8,22 +10,34 @@ import System.Exit
 import System.IO
 import System.Process
 
-run :: FilePath -> [String] -> IO (String, String, ExitCode)
-run prog args
+data Line = Stdout String
+          | Stderr String
+    deriving (Show, Read)
+
+run :: FilePath -> [String] -> FilePath -> IO ExitCode
+run prog args outputFile
  = do (hIn, hOut, hErr, ph) <- runInteractiveProcess prog args Nothing Nothing
       hClose hIn
+      hOutput <- openFile outputFile WriteMode
       mv <- newEmptyMVar
-      sOut <- hGetContents hOut
-      sErr <- hGetContents hErr
-      forkIO $ (do evaluate (length sOut)
-                   return ()
+      let getLines h c = do l <- hGetLine h
+                            putMVar mv (Just (c l))
+                            getLines h c
+          writeLines 0 = hClose hOutput
+          writeLines n = do mLine <- takeMVar mv
+                            case mLine of
+                                Just line -> do hPutStrLn hOutput (show line)
+                                                writeLines n
+                                Nothing -> writeLines (n - 1)
+      forkIO $ (do hSetBuffering hOut LineBuffering
+                   getLines hOut Stdout `onEndOfFile` return ())
                 `finally`
-                putMVar mv ())
-      forkIO $ (do evaluate (length sErr)
-                   return ()
+                putMVar mv Nothing
+      forkIO $ (do hSetBuffering hErr LineBuffering
+                   getLines hErr Stderr `onEndOfFile` return ())
                 `finally`
-                putMVar mv ())
-      ec <- waitForProcess ph
-      takeMVar mv
-      takeMVar mv
-      return (sOut, sErr, ec)
+                putMVar mv Nothing
+      forkIO $ writeLines 2
+
+      waitForProcess ph
+

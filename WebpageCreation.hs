@@ -2,10 +2,12 @@
 module WebpageCreation where
 
 import BuildStep
+import Command
 import ServerMonad
 import Utils
 
 import Control.Concurrent.MVar
+import Control.Monad
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -35,12 +37,12 @@ mkStepPage u bn bsn
           stepDir = buildDir </> "steps" </> show bsn
           page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
       -- XXX Use reader-functions with type sigs?:
+      stepName <- readFromFile (stepDir </> "name") :: IO String
       prog <- readFromFile (stepDir </> "prog") :: IO String
       args <- readFromFile (stepDir </> "args") :: IO [String]
       ec <- readFromFile (stepDir </> "exitcode") :: IO ExitCode
-      sOut <- readBinaryFile (stepDir </> "stdout")
-      sErr <- readBinaryFile (stepDir </> "stderr")
-      let description = u ++ ", build " ++ show bn ++ ", step " ++ show bsn
+      output <- liftM lines $ readBinaryFile (stepDir </> "output")
+      let description = u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": " ++ stepName
           descriptionHtml = stringToHtml description
           html = header headerHtml
              +++ body bodyHtml
@@ -56,8 +58,18 @@ mkStepPage u bn bsn
           summaryHtml = (thediv ! [theclass "summary"])
                             (linesToHtml ["Program: " ++ show prog,
                                           "Args: " ++ show args])
-          outputHtml = (thediv ! [theclass "stdout"]) (stringToHtml sOut)
-                   +++ (thediv ! [theclass "stderr"]) (stringToHtml sErr)
+          outputHtml = (pre ! [theclass "output"])
+                           (concatHtml $ map doLine output)
+          doLine lineStr = case maybeRead lineStr of
+                           Just (Stdout line) ->
+                               (thediv ! [theclass "stdout"])
+                                   (stringToHtml line)
+                           Just (Stderr line) ->
+                               (thediv ! [theclass "stderr"])
+                                   (stringToHtml line)
+                           Nothing ->
+                               (thediv ! [theclass "panic"])
+                                   (stringToHtml lineStr)
           resultHtml = (thediv ! [theclass "result"])
                            (lineToHtml ("Result: " ++ show ec))
           str = renderHtml html
