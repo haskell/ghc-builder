@@ -172,11 +172,11 @@ runBuildStep bn (bsn, bs)
           args   = bs_args   bs
           buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
       liftIO $ createDirectory buildStepDir
-      ec <- liftIO $ run prog args (buildStepDir </> "output")
       liftIO $ writeBinaryFile (buildStepDir </> "name")     (show name)
       liftIO $ writeBinaryFile (buildStepDir </> "subdir")   (show subdir)
       liftIO $ writeBinaryFile (buildStepDir </> "prog")     (show prog)
       liftIO $ writeBinaryFile (buildStepDir </> "args")     (show args)
+      ec <- liftIO $ run prog args (buildStepDir </> "output")
       liftIO $ writeBinaryFile (buildStepDir </> "exitcode") (show ec)
       return ec
 
