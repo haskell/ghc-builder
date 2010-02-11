@@ -80,13 +80,14 @@ mkBuildPage u bn bsns
  = do let buildDir = baseDir </> "clients" </> u </> "builds" </> show bn
           stepsDir = buildDir </> "steps"
           page = baseDir </> "web/builders" </> u </> show bn <.> "html"
-          mkLink bsn = do ec <- readFromFile (stepsDir </> show bsn </> "exitcode") :: IO ExitCode
+          mkLink bsn = do stepName <- readFromFile (stepsDir </> show bsn </> "name") :: IO String
+                          ec <- readFromFile (stepsDir </> show bsn </> "exitcode") :: IO ExitCode
                           let linkClass = case ec of
                                           ExitSuccess -> "success"
                                           _ -> "failure"
                           return ((anchor ! [href (show bn </> show bsn <.> "html"),
                                              theclass linkClass])
-                                     (stringToHtml (show bsn)))
+                                     (stringToHtml (show bsn ++ ": " ++ stepName)))
       links <- mapM mkLink bsns
       result <- readFromFile (buildDir </> "result")
       let linkClass = case result of
