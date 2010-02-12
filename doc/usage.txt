@@ -1,0 +1,30 @@
+
+Server
+======
+
+The server is initialised with
+    ./server init
+
+Clients are added to the Config.hs file, in the "clients"
+value. You then need to run
+    ./server add username
+
+The server is run with
+    ./server
+or
+    ./server -v
+
+Clients can currently be
+    Continuous              (as soon as one build finishes, the next begins)
+    Timed (mkTime 13 55)    (builds start at 1:55pm)
+
+Client
+======
+
+Clients are initialised with:
+    ./client init username password hostname
+
+Clients are run with:
+    ./client
+or
+    ./client -v
