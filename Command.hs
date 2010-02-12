@@ -23,6 +23,8 @@ run prog args outputFile
       let getLines h c = do l <- hGetLine h
                             putMVar mv (Just (c l))
                             getLines h c
+          writeLines :: Int -- how many of stdout and stderr are till open
+                     -> IO ()
           writeLines 0 = hClose hOutput
           writeLines n = do mLine <- takeMVar mv
                             case mLine of

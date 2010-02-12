@@ -40,42 +40,48 @@ main = do args <- getArgs
               ["-v"]   -> withSocketsDo $ runClient Verbose
               -- XXX user and pass oughtn't really be given on the
               -- commandline, but hey
-              ["init", user, pass] -> initClient user pass
+              ["init", user, pass, host] -> initClient user pass host
               _        -> die "Bad args"
 
-initClient :: String -> String -> IO ()
-initClient user pass
+initClient :: String -> String -> String -> IO ()
+initClient user pass host
  = do -- XXX We really ought to catch an already-exists
       -- exception and handle it properly
       createDirectory baseSubDir
       createDirectory (baseSubDir </> "builds")
       writeBinaryFile (baseSubDir </> "user") user
       writeBinaryFile (baseSubDir </> "pass") pass
+      writeBinaryFile (baseSubDir </> "host") host
 
 runClient :: Verbosity -> IO ()
 runClient v = do curDir <- getCurrentDirectory
-                 connLoop curDir
-    where connLoop curDir
-              = do h <- conn 5
+                 let baseDir = curDir </> baseSubDir
+                 host <- readBinaryFile (baseDir </> "host")
+                 connLoop baseDir host
+    where connLoop baseDir host
+              = do h <- conn host 5
                    verbose' v "Connected."
 
-                   let client = mkClientState v (curDir </> baseSubDir) h
+                   let client = mkClientState v baseDir h
                    evalClientMonad doClient client
-              `onEndOfFile` connLoop curDir
+              `onEndOfFile` connLoop baseDir host
 
-          conn secs = do verbose' v "Connecting..."
-                         c `onDoesNotExist`
-                             do verbose' v ("Failed...sleeping for " ++ show secs ++ " seconds...")
-                                threadDelay (secs * 1000000)
-                                conn ((secs * 2) `min` 600)
+          conn host secs
+              = do verbose' v "Connecting..."
+                   c host `onDoesNotExist`
+                          do verbose' v ("Failed...sleeping for " ++ show secs ++ " seconds...")
+                             threadDelay (secs * 1000000)
+                             conn host ((secs * 2) `min` 600)
 
-          c = do addrinfos <- getAddrInfo Nothing (Just remoteHost) (Just (show port))
-                 let serveraddr = head addrinfos
-                 sock <- socket (addrFamily serveraddr) Stream defaultProtocol
-                 connect sock (addrAddress serveraddr)
-                 h <- socketToHandle sock ReadWriteMode
-                 hSetBuffering h LineBuffering
-                 return h
+          c host = do addrinfos <- getAddrInfo Nothing (Just host)
+                                                       (Just (show port))
+                      let serveraddr = head addrinfos
+                      sock <- socket (addrFamily serveraddr) Stream
+                                     defaultProtocol
+                      connect sock (addrAddress serveraddr)
+                      h <- socketToHandle sock ReadWriteMode
+                      hSetBuffering h LineBuffering
+                      return h
 
 doClient :: ClientMonad ()
 doClient = do authenticate
