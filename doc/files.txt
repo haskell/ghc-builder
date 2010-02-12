@@ -1,0 +1,28 @@
+
+server has:
+
+web/builders/index.html
+web/builders/$client/index.html
+web/builders/$client/$buildnum/index.html
+web/builders/$client/$buildnum/$buildstep.html
+clients/$client/last_build_num_allocated
+clients/$client/last_build_num_uploaded
+clients/$client/builds/$buildnum/steps/$buildstep/prog
+clients/$client/builds/$buildnum/steps/$buildstep/args
+clients/$client/builds/$buildnum/steps/$buildstep/exitcode
+clients/$client/builds/$buildnum/steps/$buildstep/stdout
+clients/$client/builds/$buildnum/steps/$buildstep/stderr
+clients/$client/builds/$buildnum/result
+
+clients have:
+
+builder/builds/$buildnum/steps/$buildstep/prog
+builder/builds/$buildnum/steps/$buildstep/args
+builder/builds/$buildnum/steps/$buildstep/exitcode
+builder/builds/$buildnum/steps/$buildstep/stdout
+builder/builds/$buildnum/steps/$buildstep/stderr
+builder/builds/$buildnum/result
+builder/tempbuild
+builder/user
+builder/pass
+
