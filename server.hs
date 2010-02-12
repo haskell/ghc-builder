@@ -64,7 +64,7 @@ runServer v =
                      do verbose' v ("Webpage creation thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
                         webpageCreatorThread
        forkIO webpageCreatorThread
-       addrinfos <- getAddrInfo Nothing Nothing (Just "3000")
+       addrinfos <- getAddrInfo Nothing Nothing (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose

@@ -69,7 +69,7 @@ runClient v = do curDir <- getCurrentDirectory
                                 threadDelay (secs * 1000000)
                                 conn ((secs * 2) `min` 600)
 
-          c = do addrinfos <- getAddrInfo Nothing (Just remoteHost) (Just "3000")
+          c = do addrinfos <- getAddrInfo Nothing (Just remoteHost) (Just (show port))
                  let serveraddr = head addrinfos
                  sock <- socket (addrFamily serveraddr) Stream defaultProtocol
                  connect sock (addrAddress serveraddr)
