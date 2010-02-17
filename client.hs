@@ -13,6 +13,10 @@ import Control.Concurrent
 import Control.Monad.State
 import Data.List
 import Network.Socket
+import OpenSSL
+import OpenSSL.PEM
+import OpenSSL.Session
+-- import OpenSSL.X509
 import Prelude hiding (catch)
 import System.Directory
 import System.Environment
@@ -37,8 +41,8 @@ getBuildResultFile bn = do dir <- getBaseDir
 main :: IO ()
 main = do args <- getArgs
           case args of
-              []       -> withSocketsDo $ runClient Normal
-              ["-v"]   -> withSocketsDo $ runClient Verbose
+              []       -> withSocketsDo $ withOpenSSL $ runClient Normal
+              ["-v"]   -> withSocketsDo $ withOpenSSL $ runClient Verbose
               -- XXX user and pass oughtn't really be given on the
               -- commandline, but hey
               ["init", user, pass, host] -> initClient user pass host
@@ -60,10 +64,10 @@ runClient v = do curDir <- getCurrentDirectory
                  host <- readBinaryFile (baseDir </> "host")
                  connLoop baseDir host
     where connLoop baseDir host
-              = do h <- conn host 5
+              = do s <- conn host 5
                    verbose' v "Connected."
 
-                   let client = mkClientState v baseDir h
+                   let client = mkClientState v baseDir (Socket s)
                    evalClientMonad doClient client
               `onEndOfFile` connLoop baseDir host
 
@@ -79,13 +83,12 @@ runClient v = do curDir <- getCurrentDirectory
                       let serveraddr = head addrinfos
                       sock <- socket (addrFamily serveraddr) Stream
                                      defaultProtocol
-                      connect sock (addrAddress serveraddr)
-                      h <- socketToHandle sock ReadWriteMode
-                      hSetBuffering h LineBuffering
-                      return h
+                      Network.Socket.connect sock (addrAddress serveraddr)
+                      return sock
 
 doClient :: ClientMonad ()
-doClient = do authenticate
+doClient = do startSsl
+              authenticate
               uploadAllBuildResults
               mainLoop
 
@@ -125,6 +128,37 @@ verbose' v str = when (v >= Verbose) $ putStrLn str
 sendServer :: String -> ClientMonad ()
 sendServer str = do verbose ("Sending: " ++ show str)
                     hlPutStrLn str
+
+wantSsl :: Bool
+wantSsl = True
+
+startSsl :: ClientMonad ()
+startSsl
+ | wantSsl   = do h <- getHandle
+                  case h of
+                      Socket sock -> do
+                          sendServer "START SSL"
+                          -- rootPem <- liftIO $ readFile "root.pem"
+                          clientPem <- liftIO $ readFile "client.pem"
+                          -- rootX509 <- liftIO $ readX509 rootPem
+                          clientX509 <- liftIO $ readX509 clientPem
+                          clientPrivateKey <- liftIO $ readPrivateKey clientPem (PwStr "password")
+                          -- verf <- liftIO $ verifyX509 rootX509 clientPrivateKey
+                          sslContext <- liftIO $ context
+                          liftIO $ contextSetCertificate sslContext clientX509
+                          liftIO $ contextSetPrivateKey sslContext clientPrivateKey
+                          -- liftIO $ contextCheckPrivateKey sslContext
+                          liftIO $ contextSetCAFile sslContext "root.pem"
+                          ssl <- liftIO $ OpenSSL.Session.connection sslContext sock
+                          liftIO $ OpenSSL.Session.connect ssl
+                          -- mpc <- liftIO $ getPeerCertificate ssl
+                          -- liftIO $ getVerifyResult ssl
+                          setHandle (Ssl ssl)
+                          getTheResponseCode 200
+                      _ ->
+                          error "XXX Can't happen: Expected a socket"
+ | otherwise = do sendServer "NO SSL"
+                  getTheResponseCode 200
 
 authenticate :: ClientMonad ()
 authenticate = do dir <- getBaseDir

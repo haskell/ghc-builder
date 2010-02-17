@@ -18,6 +18,10 @@ import Data.Char
 import Data.List
 import Data.Time.LocalTime
 import Network.Socket
+import OpenSSL
+import OpenSSL.PEM
+import OpenSSL.Session
+-- import OpenSSL.X509
 import Prelude hiding (catch)
 import System.Directory
 import System.Environment
@@ -28,8 +32,8 @@ import System.IO
 main :: IO ()
 main = do args <- getArgs
           case args of
-              []              -> withSocketsDo $ runServer Normal
-              ["-v"]          -> withSocketsDo $ runServer Verbose
+              []              -> withSocketsDo $ withOpenSSL $ runServer Normal
+              ["-v"]          -> withSocketsDo $ withOpenSSL $ runServer Verbose
               ["init"]        -> initServer
               ["add", client] -> addClient client
               _               -> die "Bad args"
@@ -76,16 +80,43 @@ listenForClients :: Verbosity -> WCVar -> AddrInfo -> Socket
 listenForClients v mv serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
-      let mainLoop = do (conn, _) <- accept sock
-                        h <- socketToHandle conn ReadWriteMode
-                        hSetBuffering h LineBuffering
-                        forkIO $ authClient v h mv
+      let mainLoop = do (conn, _) <- Network.Socket.accept sock
+                        forkIO $ startSsl v conn mv
                         mainLoop
       mainLoop
 
-authClient :: Verbosity -> Handle -> WCVar -> IO ()
+startSsl :: Verbosity -> Socket -> WCVar -> IO ()
+startSsl v s mv
+ = do msg <- hlGetLine' s
+      when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
+      case msg of
+          "START SSL" ->
+              do -- rootPem <- readFile "root.pem"
+                 serverPem <- readFile "server.pem"
+                 -- rootX509 <- readX509 rootPem
+                 serverX509 <- readX509 serverPem
+                 serverPrivateKey <- readPrivateKey serverPem (PwStr "password")
+                 -- verf <- verifyX509 rootX509 serverPrivateKey
+                 sslContext <- context
+                 contextSetCertificate sslContext serverX509
+                 contextSetPrivateKey sslContext serverPrivateKey
+                 -- contextCheckPrivateKey sslContext
+                 contextSetCAFile sslContext "root.pem"
+                 ssl <- OpenSSL.Session.connection sslContext s
+                 OpenSSL.Session.accept ssl
+                 -- mpc <- getPeerCertificate ssl
+                 -- getVerifyResult ssl
+                 sendHandle v ssl "200 Welcome to SSL"
+                 authClient v (Ssl ssl) mv
+          "NO SSL" ->
+              do sendHandle v s "200 OK, no SSL"
+                 authClient v (Socket s) mv
+          _ -> do sendHandle v s "501 Expected SSL instructions"
+                  startSsl v s mv
+
+authClient :: Verbosity -> HandleOrSsl -> WCVar -> IO ()
 authClient v h mv
- = do msg <- hGetLine h
+ = do msg <- hlGetLine' h
       when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
       case stripPrefix "AUTH " msg of
           Just xs ->
@@ -115,18 +146,21 @@ authClient v h mv
                       do sendHandle v h "500 I don't understand"
                          authClient v h mv
 
+verbose :: String -> ServerMonad ()
+verbose str = do v <- getVerbosity
+                 liftIO $ verbose' v str
+
 verbose' :: Verbosity -> String -> IO ()
 verbose' v str = when (v >= Verbose) $ putStrLn str
 
-sendHandle :: Verbosity -> Handle -> String -> IO ()
+sendHandle :: Handlelike h => Verbosity -> h -> String -> IO ()
 sendHandle v h str
  = do verbose' v ("Sending: " ++ show str)
-      hPutStrLn h str
+      hlPutStrLn' h str
 
 sendClient :: String -> ServerMonad ()
 sendClient str
- = do v <- getVerbosity
-      liftIO $ verbose' v ("Sending: " ++ show str)
+ = do verbose ("Sending: " ++ show str)
       hlPutStrLn str
 
 handleClient :: ServerMonad ()

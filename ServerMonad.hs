@@ -30,7 +30,7 @@ newtype ServerMonad a = ServerMonad (StateT ServerState IO a)
     deriving (Monad, MonadIO)
 
 data ServerState = ServerState {
-                       ss_handle :: Handle,
+                       ss_handleOrSsl :: HandleOrSsl,
                        ss_user :: String,
                        ss_verbosity :: Verbosity,
                        ss_webpage_creation_var :: WCVar,
@@ -38,12 +38,12 @@ data ServerState = ServerState {
                        ss_user_info :: UserInfo
                    }
 
-mkServerState :: Handle -> User -> Verbosity -> WCVar
+mkServerState :: HandleOrSsl -> User -> Verbosity -> WCVar
               -> TimeOfDay -> UserInfo
               -> ServerState
 mkServerState h u v wcvar lrt ui
     = ServerState {
-          ss_handle = h,
+          ss_handleOrSsl = h,
           ss_user = u,
           ss_verbosity = v,
           ss_webpage_creation_var = wcvar,
@@ -58,9 +58,9 @@ getVerbosity :: ServerMonad Verbosity
 getVerbosity = do st <- ServerMonad get
                   return $ ss_verbosity st
 
-getHandle :: ServerMonad Handle
-getHandle = do st <- ServerMonad get
-               return $ ss_handle st
+getHandleOrSsl :: ServerMonad HandleOrSsl
+getHandleOrSsl = do st <- ServerMonad get
+                    return $ ss_handleOrSsl st
 
 getUser :: ServerMonad String
 getUser = do st <- ServerMonad get
@@ -87,10 +87,10 @@ getWebpageCreatorVar = do st <- ServerMonad get
                           return $ ss_webpage_creation_var st
 
 instance HandlelikeM ServerMonad where
-    hlPutStrLn str = do h <- getHandle
+    hlPutStrLn str = do h <- getHandleOrSsl
                         liftIO $ hlPutStrLn' h str
-    hlGetLine = do h <- getHandle
+    hlGetLine = do h <- getHandleOrSsl
                    liftIO $ hlGetLine' h
-    hlGet n = do h <- getHandle
+    hlGet n = do h <- getHandleOrSsl
                  liftIO $ hlGet' h n
 
