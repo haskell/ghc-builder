@@ -5,6 +5,7 @@ module Main where
 
 import BuildStep
 import Config
+import Handlelike
 import ServerMonad
 import Utils
 import WebpageCreation
@@ -125,16 +126,15 @@ sendHandle v h str
 sendClient :: String -> ServerMonad ()
 sendClient str
  = do v <- getVerbosity
-      h <- getHandle
-      liftIO $ sendHandle v h str
+      liftIO $ verbose' v ("Sending: " ++ show str)
+      hlPutStrLn str
 
 handleClient :: ServerMonad ()
 handleClient = do talk
                   handleClient
     where talk :: ServerMonad ()
-          talk = do h <- getHandle
-                    v <- getVerbosity
-                    msg <- liftIO $ hGetLine h
+          talk = do v <- getVerbosity
+                    msg <- hlGetLine
                     liftIO $ when (v >= Verbose) $
                         putStrLn ("Received: " ++ show msg)
                     case msg of
@@ -147,14 +147,14 @@ handleClient = do talk
                                let thisBuildNum = lastBuildNum + 1
                                writeToFile lastBuildNumFile thisBuildNum
                                bss <- getBuildInstructions
-                               sendSizedThing h $ mkBuildInstructions thisBuildNum bss
+                               sendSizedThing $ mkBuildInstructions thisBuildNum bss
                                sendClient "200 That's it"
                         "LAST UPLOADED" ->
                             do sendClient "201 Build number follows"
                                user <- getUser
                                let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_uploaded"
                                lastBuildNum <- readFromFile lastBuildNumFile
-                               sendSizedThing h (lastBuildNum :: BuildNum)
+                               sendSizedThing (lastBuildNum :: BuildNum)
                                sendClient "200 That's it"
                         "READY" ->
                             do
@@ -184,8 +184,7 @@ handleClient = do talk
 
 receiveBuildStep :: BuildNum -> BuildStepNum -> ServerMonad ()
 receiveBuildStep buildNum buildStepNum
- = do h <- getHandle
-      user <- getUser
+ = do user <- getUser
       let userDir = baseDir </> "clients" </> user
           buildDir = userDir </> "builds" </> show buildNum
           stepsDir = buildDir </> "steps"
@@ -195,27 +194,27 @@ receiveBuildStep buildNum buildStepNum
       liftIO $ createDirectoryIfMissing False buildStepDir
       -- Get the name
       sendClient "203 Send name"
-      name <- readSizedThing h
+      name <- readSizedThing
       writeBinaryFile (buildStepDir </> "name") (show (name :: String))
       -- Get the program
       sendClient "203 Send subdir"
-      subdir <- readSizedThing h
+      subdir <- readSizedThing
       writeBinaryFile (buildStepDir </> "subdir") (show (subdir :: FilePath))
       -- Get the program
       sendClient "203 Send program"
-      prog <- readSizedThing h
+      prog <- readSizedThing
       writeBinaryFile (buildStepDir </> "prog") (show (prog :: String))
       -- Get the args
       sendClient "203 Send args"
-      args <- readSizedThing h
+      args <- readSizedThing
       writeBinaryFile (buildStepDir </> "args") (show (args :: [String]))
       -- Get the exit code
       sendClient "203 Send exit code"
-      ec <- readSizedThing h
+      ec <- readSizedThing
       writeBinaryFile (buildStepDir </> "exitcode") (show (ec :: ExitCode))
       -- Get the output
       sendClient "203 Send output"
-      output <- getSizedThing h
+      output <- getSizedThing
       writeBinaryFile (buildStepDir </> "output") output
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
@@ -223,14 +222,13 @@ receiveBuildStep buildNum buildStepNum
 
 receiveBuildResult :: BuildNum -> ServerMonad ()
 receiveBuildResult buildNum
- = do h <- getHandle
-      user <- getUser
+ = do user <- getUser
       let userDir = baseDir </> "clients" </> user
           buildDir = userDir </> "builds" </> show buildNum
       liftIO $ createDirectoryIfMissing False buildDir
       -- Get the program
       sendClient "203 Send result"
-      res <- readSizedThing h
+      res <- readSizedThing
       writeBinaryFile (buildDir </> "result") (show (res :: Result))
       -- update the "last buildnum uploaded" record
       let lastFile = userDir </> "last_build_num_uploaded"

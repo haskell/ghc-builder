@@ -6,6 +6,7 @@ module Main where
 import BuildStep
 import ClientMonad
 import Command
+import Handlelike
 import Utils
 
 import Control.Concurrent
@@ -123,8 +124,7 @@ verbose' v str = when (v >= Verbose) $ putStrLn str
 
 sendServer :: String -> ClientMonad ()
 sendServer str = do verbose ("Sending: " ++ show str)
-                    h <- getHandle
-                    liftIO $ hPutStrLn h str
+                    hlPutStrLn str
 
 authenticate :: ClientMonad ()
 authenticate = do dir <- getBaseDir
@@ -137,8 +137,7 @@ getBuildInstructions :: ClientMonad BuildInstructions
 getBuildInstructions
  = do sendServer "BUILD INSTRUCTIONS"
       getTheResponseCode 201
-      h <- getHandle
-      bi <- liftIO $ readSizedThing h
+      bi <- readSizedThing
       getTheResponseCode 200
       return bi
 
@@ -194,8 +193,7 @@ uploadAllBuildResults
       unless (null bns) $
           do sendServer "LAST UPLOADED"
              getTheResponseCode 201
-             h <- getHandle
-             num <- liftIO $ readSizedThing h
+             num <- readSizedThing
              getTheResponseCode 200
              case span (<= num) (sort bns) of
                  (ys, zs) ->
@@ -211,12 +209,11 @@ removeBuildNum bn
 uploadBuildResults :: BuildNum -> ClientMonad ()
 uploadBuildResults bn
  = do baseDir <- getBaseDir
-      h <- getHandle
       let buildDir = baseDir </> "builds" </> show bn
           stepsDir = buildDir </> "steps"
           sendFile f = do getTheResponseCode 203
                           xs <- liftIO $ readBinaryFile f
-                          liftIO $ putSizedThing h xs
+                          putSizedThing xs
           sendStep bsn
               = do let stepDir = stepsDir </> show bsn
                        files = map (stepDir </>)
@@ -245,9 +242,8 @@ getAResponseCode ns = do rc <- getResponseCode
                          unless (rc `elem` ns) $ die "Bad response code"
 
 getResponseCode :: ClientMonad Int
-getResponseCode = do h <- getHandle
-                     v <- getVerbosity
-                     str <- liftIO $ hGetLine h
+getResponseCode = do v <- getVerbosity
+                     str <- hlGetLine
                      liftIO $ when (v >= Verbose) $
                          putStrLn ("Received: " ++ show str)
                      case maybeRead $ takeWhile (' ' /=) str of

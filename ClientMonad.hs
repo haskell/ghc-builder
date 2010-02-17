@@ -2,12 +2,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module ClientMonad (ClientMonad, evalClientMonad, mkClientState,
-                    getVerbosity, getBaseDir, getHandle
+                    getVerbosity, getBaseDir
                    ) where
 
+import Handlelike
 import Utils
 
 import Control.Monad.State
+import qualified Data.ByteString.Lazy.Char8 as BS
 import System.IO
 
 newtype ClientMonad a = ClientMonad (StateT ClientState IO a)
@@ -41,4 +43,13 @@ getHandle = do st <- ClientMonad get
 getBaseDir :: ClientMonad FilePath
 getBaseDir = do st <- ClientMonad get
                 return $ cs_basedir st
+
+instance HandlelikeM ClientMonad where
+    hlPutStrLn str = do h <- getHandle
+                        liftIO $ hPutStrLn h str
+    hlGetLine = do h <- getHandle
+                   liftIO $ hGetLine h
+    hlGet n = do h <- getHandle
+                 bs <- liftIO $ BS.hGet h n
+                 return $ BS.unpack bs
 

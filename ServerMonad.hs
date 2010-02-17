@@ -3,7 +3,7 @@
 
 module ServerMonad (
                     ServerMonad, evalServerMonad, mkServerState,
-                    getVerbosity, getHandle, getUser,
+                    getVerbosity, getUser,
                     getLastReadyTime, setLastReadyTime,
                     getScheduledBuildTime, getBuildInstructions,
                     getWebpageCreatorVar,
@@ -13,10 +13,12 @@ module ServerMonad (
                    ) where
 
 import BuildStep
+import Handlelike
 import Utils
 
 import Control.Concurrent.MVar
 import Control.Monad.State
+import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Time.LocalTime
 import System.IO
 
@@ -84,4 +86,13 @@ getBuildInstructions = do st <- ServerMonad get
 getWebpageCreatorVar :: ServerMonad WCVar
 getWebpageCreatorVar = do st <- ServerMonad get
                           return $ ss_webpage_creation_var st
+
+instance HandlelikeM ServerMonad where
+    hlPutStrLn str = do h <- getHandle
+                        liftIO $ hPutStrLn h str
+    hlGetLine = do h <- getHandle
+                   liftIO $ hGetLine h
+    hlGet n = do h <- getHandle
+                 bs <- liftIO $ BS.hGet h n
+                 return $ BS.unpack bs
 

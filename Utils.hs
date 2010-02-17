@@ -2,11 +2,11 @@
 module Utils where
 
 import BuildStep
+import Handlelike
 
 import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
-import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.List
 import Data.Time.Clock
 import Data.Time.LocalTime
@@ -45,34 +45,34 @@ writeBinaryFile :: MonadIO m => FilePath -> String -> m ()
 writeBinaryFile fp str
     = liftIO $ withBinaryFile fp WriteMode (\h -> hPutStr h str)
 
-readSizedThing :: (MonadIO m, Read a) => Handle -> m a
-readSizedThing h
- = do str <- getSizedThing h
+readSizedThing :: (MonadIO m, HandlelikeM m, Read a) => m a
+readSizedThing
+ = do str <- getSizedThing
       case maybeRead str of
           Nothing ->
               die ("Unreadable data: " ++ show str)
           Just x ->
               return x
 
-sendSizedThing :: (MonadIO m, Show a) => Handle -> a -> m ()
-sendSizedThing h x = putSizedThing h (show x)
+sendSizedThing :: (HandlelikeM m, Show a) => a -> m ()
+sendSizedThing x = putSizedThing (show x)
 
-getSizedThing :: MonadIO m => Handle -> m String
-getSizedThing h
- = do sizeStr <- liftIO $ hGetLine h
+getSizedThing :: (MonadIO m, HandlelikeM m) => m String
+getSizedThing
+ = do sizeStr <- hlGetLine
       case maybeRead sizeStr of
           Nothing ->
               die ("Bad size: " ++ show sizeStr)
           Just size ->
-              do bs <- liftIO $ BS.hGet h size
-                 line <- liftIO $ hGetLine h
+              do s <- hlGet size
+                 line <- hlGetLine
                  if null line
-                     then return $ BS.unpack bs
+                     then return s
                      else die ("Stuff after data: " ++ show line)
 
-putSizedThing :: MonadIO m => Handle -> String -> m ()
-putSizedThing h str = do liftIO $ hPutStrLn h $ show $ length str
-                         liftIO $ hPutStrLn h str
+putSizedThing :: HandlelikeM m => String -> m ()
+putSizedThing str = do hlPutStrLn $ show $ length str
+                       hlPutStrLn str
 
 readFromFile :: (MonadIO m, Read a) => FilePath -> m a
 readFromFile fp = do xs <- readBinaryFile fp
