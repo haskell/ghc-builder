@@ -1,0 +1,11 @@
+
+* Work out if SSL is actually being used correctly
+* Protocol version
+* Some sort of locking so the same client can't connect twice
+* More exception handling
+* "validate this bundle please" feature
+* e-mail reporting
+* IRC reporting
+* twitter
+* RSS
+
