@@ -18,7 +18,6 @@ import Utils
 
 import Control.Concurrent.MVar
 import Control.Monad.State
-import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Time.LocalTime
 import System.IO
 
@@ -89,10 +88,9 @@ getWebpageCreatorVar = do st <- ServerMonad get
 
 instance HandlelikeM ServerMonad where
     hlPutStrLn str = do h <- getHandle
-                        liftIO $ hPutStrLn h str
+                        liftIO $ hlPutStrLn' h str
     hlGetLine = do h <- getHandle
-                   liftIO $ hGetLine h
+                   liftIO $ hlGetLine' h
     hlGet n = do h <- getHandle
-                 bs <- liftIO $ BS.hGet h n
-                 return $ BS.unpack bs
+                 liftIO $ hlGet' h n
 
