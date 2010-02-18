@@ -20,7 +20,9 @@ class Handlelike h where
 instance Handlelike Handle where
     hlPutStrLn' h str = hPutStrLn h str
     hlGetLine' h = hGetLine h
-    hlGet' h n = liftM BS.unpack $ BS.hGet h n
+    hlGet' h n = let f n' = do bs <- BS.hGet h n'
+                               return (BS.unpack bs, BS.length bs)
+                 in hlGetLoop f n
 
 instance Handlelike SSL where
     hlPutStrLn' s str = write s (BS.pack (str ++ "\n"))
@@ -30,7 +32,9 @@ instance Handlelike SSL where
                                          [c] -> f (c : acc)
                                          _ -> error "XXX hlGetLine' Socket: Bad recv"
                       f ""
-    hlGet' s n = liftM BS.unpack $ OpenSSL.Session.read s n
+    hlGet' s n = let f n' = do bs <- OpenSSL.Session.read s n'
+                               return (BS.unpack bs, BS.length bs)
+                 in hlGetLoop f n
 
 instance Handlelike Socket where
     hlPutStrLn' s str = do _ <- send s (str ++ "\n")
@@ -42,7 +46,16 @@ instance Handlelike Socket where
                                          [c] -> f (c : acc)
                                          _ -> error "XXX hlGetLine' Socket: Bad recv"
                       f ""
-    hlGet' s n = recv s n
+    hlGet' s n = let f n' = do str <- recv s n'
+                               return (str, length str)
+                 in hlGetLoop f n
+
+hlGetLoop :: (Int -> IO (String, Int)) -> Int -> IO String
+hlGetLoop f n
+ | n <= 0    = return ""
+ | otherwise = do (str, len) <- f n
+                  rest <- hlGetLoop f (n - len)
+                  return (str ++ rest)
 
 -- XXX This is now rather misnamed:
 data HandleOrSsl = Handle Handle
