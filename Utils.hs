@@ -20,7 +20,7 @@ type User = String
 type Pass = String
 
 port :: Int
-port = 3923 -- A random number
+port = 4938 -- A random number
 
 data Verbosity = Silent | Normal | Verbose | Deafening
     deriving (Eq, Ord, Show, Read)
