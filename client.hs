@@ -1,7 +1,7 @@
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Main where
+module Main (main) where
 
 import BuildStep
 import ClientMonad
@@ -16,16 +16,13 @@ import Network.Socket
 import OpenSSL
 import OpenSSL.PEM
 import OpenSSL.Session
--- import OpenSSL.X509
+import OpenSSL.X509
 import Prelude hiding (catch)
 import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
 import System.IO
-
-remoteHost :: String
-remoteHost = "127.0.0.1"
 
 baseSubDir :: FilePath
 baseSubDir = "builder"
@@ -67,7 +64,7 @@ runClient v = do curDir <- getCurrentDirectory
               = do s <- conn host 5
                    verbose' v "Connected."
 
-                   let client = mkClientState v baseDir (Socket s)
+                   let client = mkClientState v host baseDir (Socket s)
                    evalClientMonad doClient client
               `onEndOfFile` connLoop baseDir host
 
@@ -138,27 +135,39 @@ startSsl
                   case h of
                       Socket sock -> do
                           sendServer "START SSL"
-                          -- rootPem <- liftIO $ readFile "root.pem"
                           clientPem <- liftIO $ readFile "client.pem"
-                          -- rootX509 <- liftIO $ readX509 rootPem
                           clientX509 <- liftIO $ readX509 clientPem
                           clientPrivateKey <- liftIO $ readPrivateKey clientPem (PwStr "password")
-                          -- verf <- liftIO $ verifyX509 rootX509 clientPrivateKey
                           sslContext <- liftIO $ context
                           liftIO $ contextSetCertificate sslContext clientX509
                           liftIO $ contextSetPrivateKey sslContext clientPrivateKey
-                          -- liftIO $ contextCheckPrivateKey sslContext
                           liftIO $ contextSetCAFile sslContext "root.pem"
                           ssl <- liftIO $ OpenSSL.Session.connection sslContext sock
                           liftIO $ OpenSSL.Session.connect ssl
-                          -- mpc <- liftIO $ getPeerCertificate ssl
-                          -- liftIO $ getVerifyResult ssl
+                          verifySsl ssl
                           setHandle (Ssl ssl)
                           getTheResponseCode 200
                       _ ->
                           error "XXX Can't happen: Expected a socket"
  | otherwise = do sendServer "NO SSL"
                   getTheResponseCode 200
+
+verifySsl :: SSL -> ClientMonad ()
+verifySsl ssl
+ = do verified <- liftIO $ getVerifyResult ssl
+      unless verified $ die "Certificate doesn't verify"
+      mPeerCert <- liftIO $ getPeerCertificate ssl
+      case mPeerCert of
+          Nothing ->
+              die "No peer certificate"
+          Just peerCert ->
+              do mapping <- liftIO $ getSubjectName peerCert False
+                 case lookup "CN" mapping of
+                     Just host' ->
+                         do host <- getHost
+                            unless (host == host') $ die "Certificate is for the wrong host"
+                     Nothing ->
+                         die "Certificate has no host"
 
 authenticate :: ClientMonad ()
 authenticate = do dir <- getBaseDir

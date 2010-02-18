@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module ClientMonad (ClientMonad, evalClientMonad, mkClientState,
-                    getVerbosity, getBaseDir, getHandle, setHandle
+                    getVerbosity, getHost, getBaseDir, getHandle, setHandle
                    ) where
 
 import Handlelike
@@ -16,14 +16,16 @@ newtype ClientMonad a = ClientMonad (StateT ClientState IO a)
 
 data ClientState = ClientState {
                        cs_verbosity :: Verbosity,
+                       cs_host :: String,
                        cs_basedir :: FilePath,
                        cs_handleOrSsl :: HandleOrSsl
                    }
 
-mkClientState :: Verbosity -> FilePath -> HandleOrSsl -> ClientState
-mkClientState v bd h
+mkClientState :: Verbosity -> String -> FilePath -> HandleOrSsl -> ClientState
+mkClientState v host bd h
     = ClientState {
           cs_verbosity = v,
+          cs_host = host,
           cs_basedir = bd,
           cs_handleOrSsl = h
       }
@@ -34,6 +36,10 @@ evalClientMonad (ClientMonad m) cs = evalStateT m cs
 getVerbosity :: ClientMonad Verbosity
 getVerbosity = do st <- ClientMonad get
                   return $ cs_verbosity st
+
+getHost :: ClientMonad String
+getHost = do st <- ClientMonad get
+             return $ cs_host st
 
 getHandle :: ClientMonad HandleOrSsl
 getHandle = do st <- ClientMonad get
