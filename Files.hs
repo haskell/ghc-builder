@@ -225,7 +225,7 @@ writeBuildStepExitcode root bn bsn exitcode
 
 fpBuildStepOutput :: Root -> BuildNum -> BuildStepNum -> FilePath
 fpBuildStepOutput root bn bsn
- = mkPath root (dirBuildStep bn bsn </> "exitcode")
+ = mkPath root (dirBuildStep bn bsn </> "output")
 
 removeBuildStepOutput :: MonadIO m => Root -> BuildNum -> BuildStepNum -> m ()
 removeBuildStepOutput root bn bsn
