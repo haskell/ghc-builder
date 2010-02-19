@@ -35,7 +35,7 @@ body {
 }
 
 .missing {
-    background-color: purple;
+    color: purple;
 }
 
 .summary, .result {
