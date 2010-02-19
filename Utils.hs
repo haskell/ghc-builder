@@ -1,5 +1,16 @@
 
-module Utils where
+module Utils (User, Pass, port, Verbosity (..), Result(..),
+              die, maybeRead,
+              readBinaryFile, maybeReadBinaryFile,
+              writeBinaryFile, maybeWriteBinaryFile,
+              readFromFile, maybeReadFromFile,
+              writeToFile,
+              getMaybeSizedThing, putMaybeSizedThing,
+              readSizedThing, sendSizedThing,
+              getSortedNumericDirectoryContents,
+              onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
+              getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo
+             ) where
 
 import BuildStep
 import Handlelike
@@ -53,6 +64,10 @@ writeBinaryFile :: MonadIO m => FilePath -> String -> m ()
 writeBinaryFile fp str
     = liftIO $ withBinaryFile fp WriteMode (\h -> hPutStr h str)
 
+maybeWriteBinaryFile :: MonadIO m => FilePath -> Maybe String -> m ()
+maybeWriteBinaryFile _  Nothing    = return () -- Could delete it if it exists?
+maybeWriteBinaryFile fp (Just str) = writeBinaryFile fp str
+
 readSizedThing :: (MonadIO m, HandlelikeM m, Read a) => m a
 readSizedThing
  = do str <- getSizedThing
@@ -78,9 +93,31 @@ getSizedThing
                      then return s
                      else die ("Stuff after data: " ++ show line)
 
+getMaybeSizedThing :: (MonadIO m, HandlelikeM m) => m (Maybe String)
+getMaybeSizedThing
+ = do sizeStr <- hlGetLine
+      if sizeStr == "NONE"
+          then return Nothing
+          else case maybeRead sizeStr of
+               Nothing ->
+                   die ("Bad size: " ++ show sizeStr)
+               Just size ->
+                   do s <- hlGet size
+                      line <- hlGetLine
+                      if null line
+                          then return (Just s)
+                          else die ("Stuff after data: " ++ show line)
+
 putSizedThing :: HandlelikeM m => String -> m ()
 putSizedThing str = do hlPutStrLn $ show $ length str
                        hlPutStrLn str
+
+putNoSizedThing :: HandlelikeM m => m ()
+putNoSizedThing = hlPutStrLn "NONE"
+
+putMaybeSizedThing :: HandlelikeM m => Maybe String -> m ()
+putMaybeSizedThing Nothing = putNoSizedThing
+putMaybeSizedThing (Just str) = putSizedThing str
 
 readFromFile :: (MonadIO m, Read a) => FilePath -> m a
 readFromFile fp = do xs <- readBinaryFile fp
@@ -121,13 +158,6 @@ getNumericDirectoryContents fp = do xs <- getDirectoryContents fp
                            die ("Bad directory entry: " ++ show x)
                        Just n ->
                            liftM (n :) (f xs)
-
-getInterestingDirectoryContents :: FilePath -> IO [FilePath]
-getInterestingDirectoryContents fp = do xs <- getDirectoryContents fp
-                                        return $ filter interesting xs
-    where interesting "."  = False
-          interesting ".." = False
-          interesting _    = True
 
 ignoreDoesNotExist :: IO () -> IO ()
 ignoreDoesNotExist io = io `catch` \e -> unless (isDoesNotExistError e)

@@ -229,28 +229,28 @@ receiveBuildStep buildNum buildStepNum
       liftIO $ createDirectoryIfMissing False buildStepDir
       -- Get the name
       sendClient "203 Send name"
-      name <- readSizedThing
-      writeBuildStepName root buildNum buildStepNum name
+      mname <- getMaybeSizedThing
+      putMaybeBuildStepName root buildNum buildStepNum mname
       -- Get the program
       sendClient "203 Send subdir"
-      subdir <- readSizedThing
-      writeBuildStepSubdir root buildNum buildStepNum subdir
+      msubdir <- getMaybeSizedThing
+      putMaybeBuildStepSubdir root buildNum buildStepNum msubdir
       -- Get the program
       sendClient "203 Send program"
-      prog <- readSizedThing
-      writeBuildStepProg root buildNum buildStepNum prog
+      mprog <- getMaybeSizedThing
+      putMaybeBuildStepProg root buildNum buildStepNum mprog
       -- Get the args
       sendClient "203 Send args"
-      args <- readSizedThing
-      writeBuildStepArgs root buildNum buildStepNum args
+      margs <- getMaybeSizedThing
+      putMaybeBuildStepArgs root buildNum buildStepNum margs
       -- Get the exit code
       sendClient "203 Send exit code"
-      ec <- readSizedThing
-      writeBuildStepExitcode root buildNum buildStepNum ec
+      mec <- getMaybeSizedThing
+      putMaybeBuildStepExitcode root buildNum buildStepNum mec
       -- Get the output
       sendClient "203 Send output"
-      output <- getSizedThing
-      writeBinaryFile (buildStepDir </> "output") output
+      moutput <- getMaybeSizedThing
+      putMaybeBuildStepOutput root buildNum buildStepNum moutput
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
       sendClient "200 Got it, thanks!"
@@ -264,8 +264,8 @@ receiveBuildResult buildNum
       liftIO $ createDirectoryIfMissing False buildDir
       -- Get the program
       sendClient "203 Send result"
-      res <- readSizedThing
-      writeBuildResult root buildNum res
+      mres <- getMaybeSizedThing
+      putMaybeBuildResult root buildNum mres
       -- update the "last buildnum uploaded" record
       let lastFile = userDir </> "last_build_num_uploaded"
       l <- readFromFile lastFile
