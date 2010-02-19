@@ -234,7 +234,7 @@ receiveBuildStep buildNum buildStepNum
       -- Get the program
       sendClient "203 Send subdir"
       subdir <- readSizedThing
-      writeBinaryFile (buildStepDir </> "subdir") (show (subdir :: FilePath))
+      writeBuildStepSubdir root buildNum buildStepNum subdir
       -- Get the program
       sendClient "203 Send program"
       prog <- readSizedThing

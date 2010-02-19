@@ -188,9 +188,10 @@ getBuildInstructions
 runBuildInstructions :: BuildInstructions -> ClientMonad ()
 runBuildInstructions (bn, bss)
  = do baseDir <- getBaseDir
-      let buildDir = baseDir </> "builds" </> show bn
+      let root = Client (baseDir </> "clients")
+          buildDir = baseDir </> "builds" </> show bn
       liftIO $ createDirectory buildDir
-      liftIO $ writeToFile (buildDir </> "result") Incomplete
+      writeBuildResult root bn Incomplete
       liftIO $ createDirectory (buildDir </> "steps")
       tempBuildDir <- getTempBuildDir
       liftIO $ ignoreDoesNotExist $ removeDirectoryRecursive tempBuildDir
@@ -222,10 +223,10 @@ runBuildStep bn (bsn, bs)
           args   = bs_args   bs
           buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
       liftIO $ createDirectory buildStepDir
-      writeBuildStepName root bn bsn name
-      liftIO $ writeBinaryFile (buildStepDir </> "subdir")   (show subdir)
-      writeBuildStepProg root bn bsn prog
-      writeBuildStepArgs root bn bsn args
+      writeBuildStepName     root bn bsn name
+      writeBuildStepSubdir   root bn bsn subdir
+      writeBuildStepProg     root bn bsn prog
+      writeBuildStepArgs     root bn bsn args
       ec <- liftIO $ run prog args (buildStepDir </> "output")
       writeBuildStepExitcode root bn bsn ec
       return ec

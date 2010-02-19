@@ -39,6 +39,7 @@ mkStepPage u bn bsn
           stepDir = buildDir </> "steps" </> show bsn
           page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
       stepName <- readBuildStepName root bn bsn
+      subdir <- readBuildStepSubdir root bn bsn
       prog <- readBuildStepProg root bn bsn
       args <- readBuildStepArgs root bn bsn
       ec <- readBuildStepExitcode root bn bsn
@@ -58,7 +59,8 @@ mkStepPage u bn bsn
                            noHtml
           summaryHtml = (thediv ! [theclass "summary"])
                             (linesToHtml ["Program: " ++ show prog,
-                                          "Args: " ++ show args])
+                                          "Args: " ++ show args,
+                                          "Subdir: " ++ show subdir])
           outputHtml = (pre ! [theclass "output"])
                            (concatHtml $ map doLine output)
           doLine lineStr = case maybeRead lineStr of

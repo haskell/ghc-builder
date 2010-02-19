@@ -1,6 +1,7 @@
 
 module Files (Root(..),
               readBuildStepName,        writeBuildStepName,
+              readBuildStepSubdir,      writeBuildStepSubdir,
               readBuildStepProg,        writeBuildStepProg,
               readBuildStepArgs,        writeBuildStepArgs,
               readBuildStepExitcode,    writeBuildStepExitcode,
@@ -35,6 +36,16 @@ readBuildStepName root bn bsn = readFromFile $ fpBuildStepName root bn bsn
 writeBuildStepName :: MonadIO m => Root -> BuildNum -> BuildStepNum -> String -> m ()
 writeBuildStepName root bn bsn n
  = writeBinaryFile (fpBuildStepName root bn bsn) (show n)
+
+fpBuildStepSubdir :: Root -> BuildNum -> BuildStepNum -> FilePath
+fpBuildStepSubdir root bn bsn = mkPath root (dirBuildStep bn bsn </> "name")
+
+readBuildStepSubdir :: MonadIO m => Root -> BuildNum -> BuildStepNum -> m FilePath
+readBuildStepSubdir root bn bsn = readFromFile $ fpBuildStepSubdir root bn bsn
+
+writeBuildStepSubdir :: MonadIO m => Root -> BuildNum -> BuildStepNum -> FilePath -> m ()
+writeBuildStepSubdir root bn bsn subdir
+ = writeBinaryFile (fpBuildStepSubdir root bn bsn) (show subdir)
 
 fpBuildStepProg :: Root -> BuildNum -> BuildStepNum -> FilePath
 fpBuildStepProg root bn bsn = mkPath root (dirBuildStep bn bsn </> "prog")
