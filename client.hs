@@ -261,7 +261,8 @@ uploadBuildResults bn
                             m <- f
                             putMaybeSizedThing m
           sendStep bsn
-              = do let strings = [getMaybeBuildStepName     root bn bsn,
+              = do let stepDir = stepsDir </> show bsn
+                       strings = [getMaybeBuildStepName     root bn bsn,
                                   getMaybeBuildStepSubdir   root bn bsn,
                                   getMaybeBuildStepProg     root bn bsn,
                                   getMaybeBuildStepArgs     root bn bsn,
@@ -270,16 +271,21 @@ uploadBuildResults bn
                    sendServer ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendString strings
                    getTheResponseCode 200
-                   -- XXX liftIO $ mapM_ removeFile files
-                   -- XXX liftIO $ removeDirectory stepDir
+                   removeBuildStepName     root bn bsn
+                   removeBuildStepSubdir   root bn bsn
+                   removeBuildStepProg     root bn bsn
+                   removeBuildStepArgs     root bn bsn
+                   removeBuildStepExitcode root bn bsn
+                   removeBuildStepOutput   root bn bsn
+                   liftIO $ removeDirectory stepDir
       bsns <- liftIO $ getSortedNumericDirectoryContents stepsDir
       mapM_ sendStep bsns
       liftIO $ removeDirectory stepsDir
       sendServer ("RESULT " ++ show bn)
       sendString $ getMaybeBuildResult root bn
       getTheResponseCode 200
-      -- XXX liftIO $ removeFile resultFile
-      -- XXX liftIO $ removeDirectory buildDir
+      removeBuildResult root bn
+      liftIO $ removeDirectory buildDir
 
 getTheResponseCode :: Int -> ClientMonad ()
 getTheResponseCode n = getAResponseCode [n]
