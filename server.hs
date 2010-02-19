@@ -5,6 +5,7 @@ module Main where
 
 import BuildStep
 import Config
+import Files
 import Handlelike
 import ServerMonad
 import Utils
@@ -25,7 +26,6 @@ import OpenSSL.Session
 import Prelude hiding (catch)
 import System.Directory
 import System.Environment
-import System.Exit
 import System.FilePath
 import System.IO
 
@@ -219,7 +219,8 @@ handleClient = do talk
 receiveBuildStep :: BuildNum -> BuildStepNum -> ServerMonad ()
 receiveBuildStep buildNum buildStepNum
  = do user <- getUser
-      let userDir = baseDir </> "clients" </> user
+      let root = Server (baseDir </> "clients") user
+          userDir = baseDir </> "clients" </> user
           buildDir = userDir </> "builds" </> show buildNum
           stepsDir = buildDir </> "steps"
           buildStepDir = stepsDir </> show buildStepNum
@@ -229,7 +230,7 @@ receiveBuildStep buildNum buildStepNum
       -- Get the name
       sendClient "203 Send name"
       name <- readSizedThing
-      writeBinaryFile (buildStepDir </> "name") (show (name :: String))
+      writeBuildStepName root buildNum buildStepNum name
       -- Get the program
       sendClient "203 Send subdir"
       subdir <- readSizedThing
@@ -237,15 +238,15 @@ receiveBuildStep buildNum buildStepNum
       -- Get the program
       sendClient "203 Send program"
       prog <- readSizedThing
-      writeBinaryFile (buildStepDir </> "prog") (show (prog :: String))
+      writeBuildStepProg root buildNum buildStepNum prog
       -- Get the args
       sendClient "203 Send args"
       args <- readSizedThing
-      writeBinaryFile (buildStepDir </> "args") (show (args :: [String]))
+      writeBuildStepArgs root buildNum buildStepNum args
       -- Get the exit code
       sendClient "203 Send exit code"
       ec <- readSizedThing
-      writeBinaryFile (buildStepDir </> "exitcode") (show (ec :: ExitCode))
+      writeBuildStepExitcode root buildNum buildStepNum ec
       -- Get the output
       sendClient "203 Send output"
       output <- getSizedThing
@@ -257,13 +258,14 @@ receiveBuildStep buildNum buildStepNum
 receiveBuildResult :: BuildNum -> ServerMonad ()
 receiveBuildResult buildNum
  = do user <- getUser
-      let userDir = baseDir </> "clients" </> user
+      let root = Server (baseDir </> "clients") user
+          userDir = baseDir </> "clients" </> user
           buildDir = userDir </> "builds" </> show buildNum
       liftIO $ createDirectoryIfMissing False buildDir
       -- Get the program
       sendClient "203 Send result"
       res <- readSizedThing
-      writeBinaryFile (buildDir </> "result") (show (res :: Result))
+      writeBuildResult root buildNum res
       -- update the "last buildnum uploaded" record
       let lastFile = userDir </> "last_build_num_uploaded"
       l <- readFromFile lastFile

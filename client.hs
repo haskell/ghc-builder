@@ -6,6 +6,7 @@ module Main (main) where
 import BuildStep
 import ClientMonad
 import Command
+import Files
 import Handlelike
 import Utils
 
@@ -214,18 +215,19 @@ runBuildStep bn (bsn, bs)
       baseDir <- getBaseDir
       tempBuildDir <- getTempBuildDir
       liftIO $ setCurrentDirectory (tempBuildDir </> bs_subdir bs)
-      let name   = bs_name   bs
+      let root   = Client baseDir
+          name   = bs_name   bs
           subdir = bs_subdir bs
           prog   = bs_prog   bs
           args   = bs_args   bs
           buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
       liftIO $ createDirectory buildStepDir
-      liftIO $ writeBinaryFile (buildStepDir </> "name")     (show name)
+      writeBuildStepName root bn bsn name
       liftIO $ writeBinaryFile (buildStepDir </> "subdir")   (show subdir)
-      liftIO $ writeBinaryFile (buildStepDir </> "prog")     (show prog)
-      liftIO $ writeBinaryFile (buildStepDir </> "args")     (show args)
+      writeBuildStepProg root bn bsn prog
+      writeBuildStepArgs root bn bsn args
       ec <- liftIO $ run prog args (buildStepDir </> "output")
-      liftIO $ writeBinaryFile (buildStepDir </> "exitcode") (show ec)
+      writeBuildStepExitcode root bn bsn ec
       return ec
 
 uploadAllBuildResults :: ClientMonad ()

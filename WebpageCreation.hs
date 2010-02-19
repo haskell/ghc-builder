@@ -3,6 +3,7 @@ module WebpageCreation where
 
 import BuildStep
 import Command
+import Files
 import ServerMonad
 import Utils
 
@@ -33,14 +34,14 @@ createWebPage u bn
 
 mkStepPage :: User -> BuildNum -> BuildStepNum -> IO ()
 mkStepPage u bn bsn
- = do let buildDir = baseDir </> "clients" </> u </> "builds" </> show bn
+ = do let root = Server (baseDir </> "clients") u
+          buildDir = baseDir </> "clients" </> u </> "builds" </> show bn
           stepDir = buildDir </> "steps" </> show bsn
           page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
-      -- XXX Use reader-functions with type sigs?:
-      stepName <- readFromFile (stepDir </> "name") :: IO String
-      prog <- readFromFile (stepDir </> "prog") :: IO String
-      args <- readFromFile (stepDir </> "args") :: IO [String]
-      ec <- readFromFile (stepDir </> "exitcode") :: IO ExitCode
+      stepName <- readBuildStepName root bn bsn
+      prog <- readBuildStepProg root bn bsn
+      args <- readBuildStepArgs root bn bsn
+      ec <- readBuildStepExitcode root bn bsn
       output <- liftM lines $ readBinaryFile (stepDir </> "output")
       let description = u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": " ++ stepName
           descriptionHtml = stringToHtml description
@@ -77,11 +78,10 @@ mkStepPage u bn bsn
 
 mkBuildPage :: User -> BuildNum -> [BuildStepNum] -> IO ()
 mkBuildPage u bn bsns
- = do let buildDir = baseDir </> "clients" </> u </> "builds" </> show bn
-          stepsDir = buildDir </> "steps"
+ = do let root = Server (baseDir </> "clients") u
           page = baseDir </> "web/builders" </> u </> show bn <.> "html"
-          mkLink bsn = do stepName <- readFromFile (stepsDir </> show bsn </> "name") :: IO String
-                          ec <- readFromFile (stepsDir </> show bsn </> "exitcode") :: IO ExitCode
+          mkLink bsn = do stepName <- readBuildStepName root bn bsn
+                          ec <- readBuildStepExitcode root bn bsn
                           let linkClass = case ec of
                                           ExitSuccess -> "success"
                                           _ -> "failure"
@@ -89,7 +89,7 @@ mkBuildPage u bn bsns
                                              theclass linkClass])
                                      (stringToHtml (show bsn ++ ": " ++ stepName)))
       links <- mapM mkLink bsns
-      result <- readFromFile (buildDir </> "result")
+      result <- readBuildResult root bn
       let linkClass = case result of
                       Success -> "success"
                       Failure -> "failure"
