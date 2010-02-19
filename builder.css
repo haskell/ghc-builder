@@ -34,6 +34,10 @@ body {
     background-color: yellow;
 }
 
+.missing {
+    background-color: purple;
+}
+
 .summary, .result {
     color: blue;
     border: solid #CCCCCC 1px;

@@ -41,6 +41,14 @@ readBinaryFile :: MonadIO m => FilePath -> m String
 readBinaryFile fp = do h <- liftIO $ openBinaryFile fp ReadMode
                        liftIO $ hGetContents h
 
+maybeReadBinaryFile :: MonadIO m => FilePath -> m (Maybe String)
+maybeReadBinaryFile fp
+ = do mh <- liftIO (liftM Just (openBinaryFile fp ReadMode)
+                    `onDoesNotExist` return Nothing)
+      case mh of
+          Just h -> liftIO $ liftM Just $ hGetContents h
+          Nothing -> return Nothing
+
 writeBinaryFile :: MonadIO m => FilePath -> String -> m ()
 writeBinaryFile fp str
     = liftIO $ withBinaryFile fp WriteMode (\h -> hPutStr h str)
@@ -81,6 +89,19 @@ readFromFile fp = do xs <- readBinaryFile fp
                              die "Couldn't read from file"
                          Just x ->
                              return x
+
+maybeReadFromFile :: (MonadIO m, Read a) => FilePath -> m (Maybe a)
+maybeReadFromFile fp
+ = do mxs <- maybeReadBinaryFile fp
+      case mxs of
+          Just xs ->
+              case maybeRead xs of
+                  Nothing ->
+                      return Nothing
+                  Just x ->
+                      return x
+          Nothing ->
+              return Nothing
 
 writeToFile :: (MonadIO m, Show a) => FilePath -> a -> m ()
 writeToFile fp x = writeBinaryFile fp (show x)

@@ -38,14 +38,19 @@ mkStepPage u bn bsn
           buildDir = baseDir </> "clients" </> u </> "builds" </> show bn
           stepDir = buildDir </> "steps" </> show bsn
           page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
-      stepName <- readBuildStepName root bn bsn
-      subdir <- readBuildStepSubdir root bn bsn
-      prog <- readBuildStepProg root bn bsn
-      args <- readBuildStepArgs root bn bsn
-      ec <- readBuildStepExitcode root bn bsn
+          maybeToHtml Nothing    = (thespan ! [theclass "missing"])
+                                       (stringToHtml "Missing")
+          maybeToHtml (Just str) = stringToHtml str
+          maybeToShowHtml Nothing  = (thespan ! [theclass "missing"])
+                                         (stringToHtml "Missing")
+          maybeToShowHtml (Just x) = stringToHtml (show x)
+      mstepName <- readMaybeBuildStepName     root bn bsn
+      msubdir   <- readMaybeBuildStepSubdir   root bn bsn
+      mprog     <- readMaybeBuildStepProg     root bn bsn
+      margs     <- readMaybeBuildStepArgs     root bn bsn
+      mec       <- readMaybeBuildStepExitcode root bn bsn
       output <- liftM lines $ readBinaryFile (stepDir </> "output")
-      let description = u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": " ++ stepName
-          descriptionHtml = stringToHtml description
+      let descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
           html = header headerHtml
              +++ body bodyHtml
           bodyHtml = h1 descriptionHtml
@@ -57,10 +62,11 @@ mkStepPage u bn bsn
                                    thetype "text/css",
                                    href "../../../css/builder.css"])
                            noHtml
-          summaryHtml = (thediv ! [theclass "summary"])
-                            (linesToHtml ["Program: " ++ show prog,
-                                          "Args: " ++ show args,
-                                          "Subdir: " ++ show subdir])
+          summaryHtml
+           = (thediv ! [theclass "summary"])
+                 (stringToHtml "Program: " +++ maybeToShowHtml mprog +++ br +++
+                  stringToHtml "Args: "    +++ maybeToShowHtml margs +++ br +++
+                  stringToHtml "Subdir: "  +++ maybeToShowHtml msubdir)
           outputHtml = (pre ! [theclass "output"])
                            (concatHtml $ map doLine output)
           doLine lineStr = case maybeRead lineStr of
@@ -74,7 +80,7 @@ mkStepPage u bn bsn
                                (thediv ! [theclass "panic"])
                                    (stringToHtml lineStr)
           resultHtml = (thediv ! [theclass "result"])
-                           (lineToHtml ("Result: " ++ show ec))
+                           (stringToHtml "Result: " +++ maybeToShowHtml mec)
           str = renderHtml html
       writeBinaryFile page str
 
