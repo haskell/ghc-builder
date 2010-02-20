@@ -136,7 +136,7 @@ maybeReadFromFile fp
                   Nothing ->
                       return Nothing
                   Just x ->
-                      return x
+                      return (Just x)
           Nothing ->
               return Nothing
 

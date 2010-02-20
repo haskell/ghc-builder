@@ -231,7 +231,7 @@ receiveBuildStep buildNum buildStepNum
       sendClient "203 Send name"
       mname <- getMaybeSizedThing
       putMaybeBuildStepName root buildNum buildStepNum mname
-      -- Get the program
+      -- Get the subdir
       sendClient "203 Send subdir"
       msubdir <- getMaybeSizedThing
       putMaybeBuildStepSubdir root buildNum buildStepNum msubdir

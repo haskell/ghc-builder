@@ -187,7 +187,7 @@ getBuildInstructions
 runBuildInstructions :: BuildInstructions -> ClientMonad ()
 runBuildInstructions (bn, bss)
  = do baseDir <- getBaseDir
-      let root = Client (baseDir </> "clients")
+      let root = Client baseDir
           buildDir = baseDir </> "builds" </> show bn
       liftIO $ createDirectory buildDir
       writeBuildResult root bn Incomplete

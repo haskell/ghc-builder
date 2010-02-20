@@ -80,7 +80,7 @@ writeBuildStepName root bn bsn n
 --
 
 fpBuildStepSubdir :: Root -> BuildNum -> BuildStepNum -> FilePath
-fpBuildStepSubdir root bn bsn = mkPath root (dirBuildStep bn bsn </> "name")
+fpBuildStepSubdir root bn bsn = mkPath root (dirBuildStep bn bsn </> "subdir")
 
 removeBuildStepSubdir :: MonadIO m => Root -> BuildNum -> BuildStepNum -> m ()
 removeBuildStepSubdir root bn bsn
