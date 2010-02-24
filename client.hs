@@ -92,11 +92,14 @@ doClient = do startSsl
 mainLoop :: ClientMonad ()
 mainLoop
  = do sendServer "READY"
-      rc <- getResponseCode
-      case rc of
-          200 -> liftIO $ threadDelay (5 * 60 * 1000000)
-          202 -> doABuild
-          _ -> die ("Unexpected response code: " ++ show rc)
+      getTheResponseCode 201
+      instructions <- readSizedThing
+      getTheResponseCode 200
+      case instructions of
+          Idle ->
+              liftIO $ threadDelay (5 * 60 * 1000000)
+          StartBuild _ ->
+              doABuild
       mainLoop
 
 doABuild :: ClientMonad ()
@@ -109,11 +112,10 @@ doABuild = do bi <- getBuildInstructions
               -- We've just been doing stuff for a long time
               -- potentially, so we could have overrun a scheduled
               -- build by a long time. In that case, we don't want
-              -- to start a build hours late, so we tell the server
-              -- READY to reset the "last READY time", but we don't
-              -- start a build if it tells us we should
-              sendServer "READY"
-              getAResponseCode [200, 202]
+              -- to start a build hours late, so we reset the
+              -- "last READY time".
+              sendServer "RESET TIME"
+              getTheResponseCode 200
 
 verbose :: String -> ClientMonad ()
 verbose str = do v <- getVerbosity

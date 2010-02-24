@@ -1,15 +1,15 @@
 
-"AUTH user pass"     -> 200           or 501
+"AUTH user pass"     ->           200 or 501
 "BUILD INSTRUCTIONS" -> 201     + 200
-"READY"              -> 200           or 202
+"RESET TIME"         ->           200
+"READY"              -> 201     + 200
 "UPLOAD 123 456"     -> 203 * 6 + 200
 "RESULT 123"         -> 203     + 200
 "LAST UPLOADED"      -> 201     + 200
-_ -> 500
+_                    ->           500
 
 200 OK
 201 sized thing follows
-202 start build
 203 send sized thing
 
 500 I don't understand

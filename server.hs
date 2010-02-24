@@ -190,19 +190,26 @@ handleClient = do talk
                                lastBuildNum <- readFromFile lastBuildNumFile
                                sendSizedThing (lastBuildNum :: BuildNum)
                                sendClient "200 That's it"
+                        "RESET TIME" ->
+                            do current <- getTOD
+                               setLastReadyTime current
+                               sendClient "200 Done"
                         "READY" ->
                             do
                                scheduled <- getScheduledBuildTime
-                               case scheduled of
-                                   Continuous ->
-                                       sendClient "202 Time for a build"
-                                   Timed tod ->
-                                       do prev <- getLastReadyTime
-                                          current <- getTOD
-                                          setLastReadyTime current
-                                          if scheduledTimePassed prev current tod
-                                              then sendClient "202 Time for a build"
-                                              else sendClient "200 Nothing to do"
+                               what <- case scheduled of
+                                       Continuous ->
+                                           return (StartBuild Continuous)
+                                       Timed tod ->
+                                           do prev <- getLastReadyTime
+                                              current <- getTOD
+                                              setLastReadyTime current
+                                              if scheduledTimePassed prev current tod
+                                                  then return (StartBuild scheduled)
+                                                  else return Idle
+                               sendClient "201 Your mission, should you choose to accept it, is to:"
+                               sendSizedThing what
+                               sendClient "200 Off you go"
                         _
                          | Just xs <- stripPrefix "UPLOAD " msg,
                            (ys, ' ' : zs) <- break (' ' ==) xs,

@@ -9,6 +9,7 @@ module Utils (User, Pass, port, Verbosity (..), Result(..),
               readSizedThing, sendSizedThing,
               getSortedNumericDirectoryContents,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
+              Instructions(..),
               getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo
              ) where
 
@@ -190,8 +191,13 @@ data UserInfo = UserInfo {
                     ui_buildInstructions :: [BuildStep]
                 }
 
+data Instructions = Idle
+                  | StartBuild BuildTime
+    deriving (Show, Read)
+
 data BuildTime = Timed TimeOfDay
                | Continuous
+    deriving (Show, Read)
 
 mkUserInfo :: String -> BuildTime -> [BuildStep] -> UserInfo
 mkUserInfo pass bt bis
