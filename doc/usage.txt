@@ -1,4 +1,6 @@
 
+TODO: These instructions need to be updated with how to set up the SSL certs
+
 Server
 ======
 

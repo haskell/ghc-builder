@@ -1,5 +1,7 @@
 
+* Add SSL instructions to docs
 * Work out if SSL is actually being used correctly
+* Resource limits
 * Protocol version
 * Some sort of locking so the same client can't connect twice
 * More exception handling
