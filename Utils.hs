@@ -1,5 +1,8 @@
 
-module Utils (User, Pass, port, Verbosity (..), Result(..),
+module Utils (Response,
+              respOK, respSizedThingFollows, respSendSizedThing,
+              respHuh, respAuthFailed,
+              User, Pass, port, Verbosity (..), Result(..),
               die, maybeRead,
               readBinaryFile, maybeReadBinaryFile,
               writeBinaryFile, maybeWriteBinaryFile,
@@ -27,6 +30,23 @@ import System.Directory
 import System.Exit
 import System.IO
 import System.IO.Error hiding (catch)
+
+type Response = Int
+
+respOK :: Response
+respOK = 200
+
+respSizedThingFollows :: Response
+respSizedThingFollows = 201
+
+respSendSizedThing :: Response
+respSendSizedThing = 202
+
+respHuh :: Response
+respHuh = 500
+
+respAuthFailed :: Response
+respAuthFailed = 501
 
 type User = String
 type Pass = String

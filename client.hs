@@ -92,9 +92,9 @@ doClient = do startSsl
 mainLoop :: ClientMonad ()
 mainLoop
  = do sendServer "READY"
-      getTheResponseCode 201
+      getTheResponseCode respSizedThingFollows
       instructions <- readSizedThing
-      getTheResponseCode 200
+      getTheResponseCode respOK
       case instructions of
           Idle ->
               liftIO $ threadDelay (5 * 60 * 1000000)
@@ -115,7 +115,7 @@ doABuild = do bi <- getBuildInstructions
               -- to start a build hours late, so we reset the
               -- "last READY time".
               sendServer "RESET TIME"
-              getTheResponseCode 200
+              getTheResponseCode respOK
 
 verbose :: String -> ClientMonad ()
 verbose str = do v <- getVerbosity
@@ -148,11 +148,11 @@ startSsl
                           liftIO $ OpenSSL.Session.connect ssl
                           verifySsl ssl
                           setHandle (Ssl ssl)
-                          getTheResponseCode 200
+                          getTheResponseCode respOK
                       _ ->
                           error "XXX Can't happen: Expected a socket"
  | otherwise = do sendServer "NO SSL"
-                  getTheResponseCode 200
+                  getTheResponseCode respOK
 
 verifySsl :: SSL -> ClientMonad ()
 verifySsl ssl
@@ -176,14 +176,14 @@ authenticate = do dir <- getBaseDir
                   user <- readBinaryFile (dir </> "user")
                   pass <- readBinaryFile (dir </> "pass")
                   sendServer ("AUTH " ++ user ++ " " ++ pass)
-                  getTheResponseCode 200
+                  getTheResponseCode respOK
 
 getBuildInstructions :: ClientMonad BuildInstructions
 getBuildInstructions
  = do sendServer "BUILD INSTRUCTIONS"
-      getTheResponseCode 201
+      getTheResponseCode respSizedThingFollows
       bi <- readSizedThing
-      getTheResponseCode 200
+      getTheResponseCode respOK
       return bi
 
 runBuildInstructions :: BuildInstructions -> ClientMonad ()
@@ -239,9 +239,9 @@ uploadAllBuildResults
       bns <- liftIO $ getSortedNumericDirectoryContents buildsDir
       unless (null bns) $
           do sendServer "LAST UPLOADED"
-             getTheResponseCode 201
+             getTheResponseCode respSizedThingFollows
              num <- readSizedThing
-             getTheResponseCode 200
+             getTheResponseCode respOK
              case span (<= num) bns of
                  (ys, zs) ->
                      do mapM_ removeBuildNum ys
@@ -259,7 +259,7 @@ uploadBuildResults bn
       let root = Client baseDir
           buildDir = baseDir </> "builds" </> show bn
           stepsDir = buildDir </> "steps"
-          sendString f = do getTheResponseCode 203
+          sendString f = do getTheResponseCode respSendSizedThing
                             m <- f
                             putMaybeSizedThing m
           sendStep bsn
@@ -272,7 +272,7 @@ uploadBuildResults bn
                                   getMaybeBuildStepOutput   root bn bsn]
                    sendServer ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendString strings
-                   getTheResponseCode 200
+                   getTheResponseCode respOK
                    removeBuildStepName     root bn bsn
                    removeBuildStepSubdir   root bn bsn
                    removeBuildStepProg     root bn bsn
@@ -285,7 +285,7 @@ uploadBuildResults bn
       liftIO $ removeDirectory stepsDir
       sendServer ("RESULT " ++ show bn)
       sendString $ getMaybeBuildResult root bn
-      getTheResponseCode 200
+      getTheResponseCode respOK
       removeBuildResult root bn
       liftIO $ removeDirectory buildDir
 

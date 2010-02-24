@@ -106,12 +106,12 @@ startSsl v s mv
                  OpenSSL.Session.accept ssl
                  -- mpc <- getPeerCertificate ssl
                  -- getVerifyResult ssl
-                 sendHandle v ssl "200 Welcome to SSL"
+                 sendHandle v ssl respOK "Welcome to SSL"
                  authClient v (Ssl ssl) mv
           "NO SSL" ->
-              do sendHandle v s "200 OK, no SSL"
+              do sendHandle v s respOK "OK, no SSL"
                  authClient v (Socket s) mv
-          _ -> do sendHandle v s "501 Expected SSL instructions"
+          _ -> do sendHandle v s respHuh "Expected SSL instructions"
                   startSsl v s mv
 
 authClient :: Verbosity -> HandleOrSsl -> WCVar -> IO ()
@@ -126,24 +126,24 @@ authClient v h mv
                       Just ui
                        | ui_password ui == pass ->
                           do tod <- getTOD
-                             sendHandle v h "200 authenticated"
+                             sendHandle v h respOK "authenticated"
                              let serverState = mkServerState
                                                    h user v mv tod ui
                              evalServerMonad handleClient serverState
                       _ ->
-                          do sendHandle v h "501 auth failed"
+                          do sendHandle v h respAuthFailed "auth failed"
                              authClient v h mv
                   _ ->
-                      do sendHandle v h "500 I don't understand"
+                      do sendHandle v h respHuh "I don't understand"
                          authClient v h mv
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
-                      do sendHandle v h "500 I don't understand"
+                      do sendHandle v h respHuh "I don't understand"
                          authClient v h mv
                   _ ->
-                      do sendHandle v h "500 I don't understand"
+                      do sendHandle v h respHuh "I don't understand"
                          authClient v h mv
 
 verbose :: String -> ServerMonad ()
@@ -153,15 +153,17 @@ verbose str = do v <- getVerbosity
 verbose' :: Verbosity -> String -> IO ()
 verbose' v str = when (v >= Verbose) $ putStrLn str
 
-sendHandle :: Handlelike h => Verbosity -> h -> String -> IO ()
-sendHandle v h str
- = do verbose' v ("Sending: " ++ show str)
-      hlPutStrLn' h str
+sendHandle :: Handlelike h => Verbosity -> h -> Response -> String -> IO ()
+sendHandle v h resp str
+ = do let respStr = show resp ++ " " ++ str
+      verbose' v ("Sending: " ++ show respStr)
+      hlPutStrLn' h respStr
 
-sendClient :: String -> ServerMonad ()
-sendClient str
- = do verbose ("Sending: " ++ show str)
-      hlPutStrLn str
+sendClient :: Response -> String -> ServerMonad ()
+sendClient resp str
+ = do let respStr = show resp ++ " " ++ str
+      verbose ("Sending: " ++ show respStr)
+      hlPutStrLn respStr
 
 handleClient :: ServerMonad ()
 handleClient = do talk
@@ -174,7 +176,7 @@ handleClient = do talk
                     case msg of
                         -- XXX "HELP"
                         "BUILD INSTRUCTIONS" ->
-                            do sendClient "201 Instructions follow"
+                            do sendClient respSizedThingFollows "Instructions follow"
                                user <- getUser
                                let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_allocated"
                                lastBuildNum <- readFromFile lastBuildNumFile
@@ -182,18 +184,18 @@ handleClient = do talk
                                writeToFile lastBuildNumFile thisBuildNum
                                bss <- getBuildInstructions
                                sendSizedThing $ mkBuildInstructions thisBuildNum bss
-                               sendClient "200 That's it"
+                               sendClient respOK "That's it"
                         "LAST UPLOADED" ->
-                            do sendClient "201 Build number follows"
+                            do sendClient respSizedThingFollows "Build number follows"
                                user <- getUser
                                let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_uploaded"
                                lastBuildNum <- readFromFile lastBuildNumFile
                                sendSizedThing (lastBuildNum :: BuildNum)
-                               sendClient "200 That's it"
+                               sendClient respOK "That's it"
                         "RESET TIME" ->
                             do current <- getTOD
                                setLastReadyTime current
-                               sendClient "200 Done"
+                               sendClient respOK "Done"
                         "READY" ->
                             do
                                scheduled <- getScheduledBuildTime
@@ -207,9 +209,9 @@ handleClient = do talk
                                               if scheduledTimePassed prev current tod
                                                   then return (StartBuild scheduled)
                                                   else return Idle
-                               sendClient "201 Your mission, should you choose to accept it, is to:"
+                               sendClient respSizedThingFollows "Your mission, should you choose to accept it, is to:"
                                sendSizedThing what
-                               sendClient "200 Off you go"
+                               sendClient respOK "Off you go"
                         _
                          | Just xs <- stripPrefix "UPLOAD " msg,
                            (ys, ' ' : zs) <- break (' ' ==) xs,
@@ -220,7 +222,7 @@ handleClient = do talk
                            Just buildNum <- maybeRead xs ->
                             receiveBuildResult buildNum
                          | otherwise ->
-                            sendClient "500 I don't understand"
+                            sendClient respHuh "I don't understand"
                     talk
 
 receiveBuildStep :: BuildNum -> BuildStepNum -> ServerMonad ()
@@ -235,32 +237,32 @@ receiveBuildStep buildNum buildStepNum
       liftIO $ createDirectoryIfMissing False stepsDir
       liftIO $ createDirectoryIfMissing False buildStepDir
       -- Get the name
-      sendClient "203 Send name"
+      sendClient respSendSizedThing "Send name"
       mname <- getMaybeSizedThing
       putMaybeBuildStepName root buildNum buildStepNum mname
       -- Get the subdir
-      sendClient "203 Send subdir"
+      sendClient respSendSizedThing "Send subdir"
       msubdir <- getMaybeSizedThing
       putMaybeBuildStepSubdir root buildNum buildStepNum msubdir
       -- Get the program
-      sendClient "203 Send program"
+      sendClient respSendSizedThing "Send program"
       mprog <- getMaybeSizedThing
       putMaybeBuildStepProg root buildNum buildStepNum mprog
       -- Get the args
-      sendClient "203 Send args"
+      sendClient respSendSizedThing "Send args"
       margs <- getMaybeSizedThing
       putMaybeBuildStepArgs root buildNum buildStepNum margs
       -- Get the exit code
-      sendClient "203 Send exit code"
+      sendClient respSendSizedThing "Send exit code"
       mec <- getMaybeSizedThing
       putMaybeBuildStepExitcode root buildNum buildStepNum mec
       -- Get the output
-      sendClient "203 Send output"
+      sendClient respSendSizedThing "Send output"
       moutput <- getMaybeSizedThing
       putMaybeBuildStepOutput root buildNum buildStepNum moutput
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
-      sendClient "200 Got it, thanks!"
+      sendClient respOK "Got it, thanks!"
 
 receiveBuildResult :: BuildNum -> ServerMonad ()
 receiveBuildResult buildNum
@@ -270,7 +272,7 @@ receiveBuildResult buildNum
           buildDir = userDir </> "builds" </> show buildNum
       liftIO $ createDirectoryIfMissing False buildDir
       -- Get the program
-      sendClient "203 Send result"
+      sendClient respSendSizedThing "Send result"
       mres <- getMaybeSizedThing
       putMaybeBuildResult root buildNum mres
       -- update the "last buildnum uploaded" record
@@ -281,7 +283,7 @@ receiveBuildResult buildNum
       -- of the files
       mv <- getWebpageCreatorVar
       liftIO $ putMVar mv (user, buildNum)
-      sendClient "200 Got it, thanks!"
+      sendClient respOK "Got it, thanks!"
 
 mkBuildInstructions :: BuildNum -> [BuildStep] -> BuildInstructions
 mkBuildInstructions bn buildSteps = (bn, zip [1..] buildSteps)
