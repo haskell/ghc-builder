@@ -99,23 +99,24 @@ mainLoop
           Idle ->
               liftIO $ threadDelay (5 * 60 * 1000000)
           StartBuild _ ->
-              doABuild
+              doABuild instructions
       mainLoop
 
-doABuild :: ClientMonad ()
-doABuild = do bi <- getBuildInstructions
-              runBuildInstructions bi
-              -- XXX We will arrange it such that everything is
-              -- uploaded by the time we get here, so the build
-              -- we've just done is the next one to be uploaded
-              uploadBuildResults (fst bi)
-              -- We've just been doing stuff for a long time
-              -- potentially, so we could have overrun a scheduled
-              -- build by a long time. In that case, we don't want
-              -- to start a build hours late, so we reset the
-              -- "last READY time".
-              sendServer "RESET TIME"
-              getTheResponseCode respOK
+doABuild :: Instructions -> ClientMonad ()
+doABuild instructions
+ = do bi <- getBuildInstructions instructions
+      runBuildInstructions bi
+      -- XXX We will arrange it such that everything is
+      -- uploaded by the time we get here, so the build
+      -- we've just done is the next one to be uploaded
+      uploadBuildResults (fst bi)
+      -- We've just been doing stuff for a long time
+      -- potentially, so we could have overrun a scheduled
+      -- build by a long time. In that case, we don't want
+      -- to start a build hours late, so we reset the
+      -- "last READY time".
+      sendServer "RESET TIME"
+      getTheResponseCode respOK
 
 verbose :: String -> ClientMonad ()
 verbose str = do v <- getVerbosity
@@ -178,9 +179,11 @@ authenticate = do dir <- getBaseDir
                   sendServer ("AUTH " ++ user ++ " " ++ pass)
                   getTheResponseCode respOK
 
-getBuildInstructions :: ClientMonad BuildInstructions
-getBuildInstructions
+getBuildInstructions :: Instructions -> ClientMonad BuildInstructions
+getBuildInstructions instructions
  = do sendServer "BUILD INSTRUCTIONS"
+      getTheResponseCode respSendSizedThing
+      sendSizedThing instructions
       getTheResponseCode respSizedThingFollows
       bi <- readSizedThing
       getTheResponseCode respOK

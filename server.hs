@@ -176,13 +176,21 @@ handleClient = do talk
                     case msg of
                         -- XXX "HELP"
                         "BUILD INSTRUCTIONS" ->
-                            do sendClient respSizedThingFollows "Instructions follow"
+                            do sendClient respSendSizedThing "What sort?"
+                               instructions <- readSizedThing
                                user <- getUser
                                let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_allocated"
                                lastBuildNum <- readFromFile lastBuildNumFile
                                let thisBuildNum = lastBuildNum + 1
                                writeToFile lastBuildNumFile thisBuildNum
-                               bss <- getBuildInstructions
+                               bss <- case instructions of
+                                      StartBuild _ ->
+                                          getBuildInstructions
+                                      Idle ->
+                                          -- XXX The client did something
+                                          -- odd if we get here
+                                          getBuildInstructions
+                               sendClient respSizedThingFollows "Instructions follow"
                                sendSizedThing $ mkBuildInstructions thisBuildNum bss
                                sendClient respOK "That's it"
                         "LAST UPLOADED" ->
