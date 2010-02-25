@@ -14,7 +14,8 @@ module Utils (Response,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
               Instructions(..),
               getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
-              BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..)
+              BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
+              showTable, noPad, lPad, rPad
              ) where
 
 import Handlelike
@@ -245,4 +246,18 @@ data BuildStep = BuildStep {
                      bs_args :: [String]
                  }
     deriving (Show, Read)
+
+showTable :: [Int -> String -> String] -> [[String]] -> [String]
+showTable padders xss
+    = let lengths = map (maximum . map length) $ transpose xss
+      in map (concat . intersperse " " . zipWith3 id padders lengths) xss
+
+noPad :: Int -> String -> String
+noPad _ str = str
+
+lPad :: Int -> String -> String
+lPad n s = replicate (n - length s) ' ' ++ s
+
+rPad :: Int -> String -> String
+rPad n s = s ++ replicate (n - length s) ' '
 

@@ -1,7 +1,13 @@
 
-module Config (clients) where
+module Config (clients, fromAddress, emailAddresses) where
 
 import Utils
+
+fromAddress :: String
+fromAddress = "cvs-ghc@haskell.org"
+
+emailAddresses :: [String]
+emailAddresses = ["igloo@earth.li"]
 
 buildSteps :: [BuildStep]
 buildSteps = [BuildStep {
