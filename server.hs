@@ -6,9 +6,9 @@ module Main where
 import Config
 import Files
 import Handlelike
+import Notification
 import ServerMonad
 import Utils
-import WebpageCreation
 
 import Control.Concurrent
 import Control.Exception
@@ -61,31 +61,30 @@ addClient client
 
 runServer :: Verbosity -> IO ()
 runServer v =
-    do webpageCreationVar <- newEmptyMVar
-       let webpageCreatorThread
-               = webpageCreator webpageCreationVar
+    do notifierVar <- newEmptyMVar
+       let notifierThread
+               = notifier notifierVar
                  `catch` \e ->
-                     do verbose' v ("Webpage creation thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
-                        webpageCreatorThread
-       forkIO webpageCreatorThread
+                     do verbose' v ("Notification thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
+                        notifierThread
+       forkIO notifierThread
        addrinfos <- getAddrInfo Nothing Nothing (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
-               (listenForClients v webpageCreationVar serveraddr)
+               (listenForClients v notifierVar serveraddr)
 
-listenForClients :: Verbosity -> WCVar -> AddrInfo -> Socket
-                 -> IO ()
-listenForClients v mv serveraddr sock
+listenForClients :: Verbosity -> NVar -> AddrInfo -> Socket -> IO ()
+listenForClients v nv serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let mainLoop = do (conn, _) <- Network.Socket.accept sock
-                        forkIO $ startSsl v conn mv
+                        forkIO $ startSsl v conn nv
                         mainLoop
       mainLoop
 
-startSsl :: Verbosity -> Socket -> WCVar -> IO ()
-startSsl v s mv
+startSsl :: Verbosity -> Socket -> NVar -> IO ()
+startSsl v s nv
  = do msg <- hlGetLine' s
       when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
       case msg of
@@ -106,15 +105,15 @@ startSsl v s mv
                  -- mpc <- getPeerCertificate ssl
                  -- getVerifyResult ssl
                  sendHandle v ssl respOK "Welcome to SSL"
-                 authClient v (Ssl ssl) mv
+                 authClient v (Ssl ssl) nv
           "NO SSL" ->
               do sendHandle v s respOK "OK, no SSL"
-                 authClient v (Socket s) mv
+                 authClient v (Socket s) nv
           _ -> do sendHandle v s respHuh "Expected SSL instructions"
-                  startSsl v s mv
+                  startSsl v s nv
 
-authClient :: Verbosity -> HandleOrSsl -> WCVar -> IO ()
-authClient v h mv
+authClient :: Verbosity -> HandleOrSsl -> NVar -> IO ()
+authClient v h nv
  = do msg <- hlGetLine' h
       when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
       case stripPrefix "AUTH " msg of
@@ -127,23 +126,23 @@ authClient v h mv
                           do tod <- getTOD
                              sendHandle v h respOK "authenticated"
                              let serverState = mkServerState
-                                                   h user v mv tod ui
+                                                   h user v nv tod ui
                              evalServerMonad handleClient serverState
                       _ ->
                           do sendHandle v h respAuthFailed "auth failed"
-                             authClient v h mv
+                             authClient v h nv
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h mv
+                         authClient v h nv
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h mv
+                         authClient v h nv
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h mv
+                         authClient v h nv
 
 verbose :: String -> ServerMonad ()
 verbose str = do v <- getVerbosity
@@ -291,8 +290,8 @@ receiveBuildResult buildNum
       when (buildNum > l) $ writeToFile lastFile buildNum
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
-      mv <- getWebpageCreatorVar
-      liftIO $ putMVar mv (user, buildNum)
+      nv <- getNotifierVar
+      liftIO $ putMVar nv (user, buildNum)
       sendClient respOK "Got it, thanks!"
 
 mkBuildInstructions :: Instructions -> BuildNum -> [BuildStep] -> BuildInstructions

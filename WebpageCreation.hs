@@ -6,18 +6,11 @@ import Files
 import ServerMonad
 import Utils
 
-import Control.Concurrent.MVar
 import Control.Monad
 import System.Directory
 import System.Exit
 import System.FilePath
 import Text.XHtml.Strict
-
-webpageCreator :: WCVar -> IO ()
-webpageCreator mv
- = do (user, bn) <- takeMVar mv
-      createWebPage user bn
-      webpageCreator mv
 
 createWebPage :: User -> BuildNum -> IO ()
 createWebPage u bn

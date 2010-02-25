@@ -6,9 +6,9 @@ module ServerMonad (
                     getVerbosity, getUser,
                     getLastReadyTime, setLastReadyTime,
                     getScheduledBuildTime, getBuildInstructions,
-                    getWebpageCreatorVar,
+                    getNotifierVar,
                     -- XXX Don't really belong here:
-                    WCVar,
+                    NVar,
                     baseDir,
                    ) where
 
@@ -20,7 +20,7 @@ import Control.Monad.State
 import Data.Time.LocalTime
 import System.IO
 
-type WCVar = MVar (User, BuildNum)
+type NVar = MVar (User, BuildNum)
 
 baseDir :: FilePath
 baseDir = "data"
@@ -32,12 +32,12 @@ data ServerState = ServerState {
                        ss_handleOrSsl :: HandleOrSsl,
                        ss_user :: String,
                        ss_verbosity :: Verbosity,
-                       ss_webpage_creation_var :: WCVar,
+                       ss_webpage_creation_var :: NVar,
                        ss_last_ready_time :: TimeOfDay,
                        ss_user_info :: UserInfo
                    }
 
-mkServerState :: HandleOrSsl -> User -> Verbosity -> WCVar
+mkServerState :: HandleOrSsl -> User -> Verbosity -> NVar
               -> TimeOfDay -> UserInfo
               -> ServerState
 mkServerState h u v wcvar lrt ui
@@ -81,9 +81,9 @@ getBuildInstructions :: ServerMonad [BuildStep]
 getBuildInstructions = do st <- ServerMonad get
                           return $ ui_buildInstructions $ ss_user_info st
 
-getWebpageCreatorVar :: ServerMonad WCVar
-getWebpageCreatorVar = do st <- ServerMonad get
-                          return $ ss_webpage_creation_var st
+getNotifierVar :: ServerMonad NVar
+getNotifierVar = do st <- ServerMonad get
+                    return $ ss_webpage_creation_var st
 
 instance HandlelikeM ServerMonad where
     hlPutStrLn str = do h <- getHandleOrSsl
