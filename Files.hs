@@ -21,9 +21,11 @@ module Files (
  removeBuildResult,
  getMaybeBuildResult,       putMaybeBuildResult,
  readBuildResult,                                       writeBuildResult,
+ removeBuildInstructions,
+ getMaybeBuildInstructions, putMaybeBuildInstructions,
+ readBuildInstructions,                                 writeBuildInstructions,
              ) where
 
-import BuildStep
 import Utils
 
 import Control.Monad.Trans
@@ -266,4 +268,28 @@ readBuildResult root bn = readFromFile $ fpBuildResult root bn
 writeBuildResult :: MonadIO m => Root -> BuildNum -> Result -> m ()
 writeBuildResult root bn result
  = writeBinaryFile (fpBuildResult root bn) (show result)
+
+--
+
+fpBuildInstructions :: Root -> BuildNum -> FilePath
+fpBuildInstructions root bn = mkPath root ("builds" </> show bn </> "instructions")
+
+removeBuildInstructions :: MonadIO m => Root -> BuildNum -> m ()
+removeBuildInstructions root bn
+ = liftIO $ ignoreDoesNotExist $ removeFile (fpBuildInstructions root bn)
+
+getMaybeBuildInstructions :: MonadIO m => Root -> BuildNum -> m (Maybe String)
+getMaybeBuildInstructions root bn
+ = maybeReadBinaryFile (fpBuildInstructions root bn)
+
+putMaybeBuildInstructions :: MonadIO m => Root -> BuildNum -> Maybe String -> m ()
+putMaybeBuildInstructions root bn m
+ = maybeWriteBinaryFile (fpBuildInstructions root bn) m
+
+readBuildInstructions :: MonadIO m => Root -> BuildNum -> m Instructions
+readBuildInstructions root bn = readFromFile $ fpBuildInstructions root bn
+
+writeBuildInstructions :: MonadIO m => Root -> BuildNum -> Instructions -> m ()
+writeBuildInstructions root bn result
+ = writeBinaryFile (fpBuildInstructions root bn) (show result)
 

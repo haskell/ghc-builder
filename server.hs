@@ -3,7 +3,6 @@
 
 module Main where
 
-import BuildStep
 import Config
 import Files
 import Handlelike
@@ -191,7 +190,7 @@ handleClient = do talk
                                           -- odd if we get here
                                           getBuildInstructions
                                sendClient respSizedThingFollows "Instructions follow"
-                               sendSizedThing $ mkBuildInstructions thisBuildNum bss
+                               sendSizedThing $ mkBuildInstructions instructions thisBuildNum bss
                                sendClient respOK "That's it"
                         "LAST UPLOADED" ->
                             do sendClient respSizedThingFollows "Build number follows"
@@ -279,7 +278,10 @@ receiveBuildResult buildNum
           userDir = baseDir </> "clients" </> user
           buildDir = userDir </> "builds" </> show buildNum
       liftIO $ createDirectoryIfMissing False buildDir
-      -- Get the program
+      -- Get the result
+      sendClient respSendSizedThing "Send instructions"
+      minstrs <- getMaybeSizedThing
+      putMaybeBuildInstructions root buildNum minstrs
       sendClient respSendSizedThing "Send result"
       mres <- getMaybeSizedThing
       putMaybeBuildResult root buildNum mres
@@ -293,8 +295,13 @@ receiveBuildResult buildNum
       liftIO $ putMVar mv (user, buildNum)
       sendClient respOK "Got it, thanks!"
 
-mkBuildInstructions :: BuildNum -> [BuildStep] -> BuildInstructions
-mkBuildInstructions bn buildSteps = (bn, zip [1..] buildSteps)
+mkBuildInstructions :: Instructions -> BuildNum -> [BuildStep] -> BuildInstructions
+mkBuildInstructions instructions bn buildSteps
+ = BuildInstructions {
+       bi_instructions = instructions,
+       bi_buildNum = bn,
+       bi_buildSteps = zip [1..] buildSteps
+   }
 
 scheduledTimePassed :: TimeOfDay -> TimeOfDay -> TimeOfDay -> Bool
 scheduledTimePassed lastTime curTime scheduledTime

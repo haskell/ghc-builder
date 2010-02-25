@@ -3,7 +3,6 @@
 
 module Main (main) where
 
-import BuildStep
 import ClientMonad
 import Command
 import Files
@@ -109,7 +108,7 @@ doABuild instructions
       -- XXX We will arrange it such that everything is
       -- uploaded by the time we get here, so the build
       -- we've just done is the next one to be uploaded
-      uploadBuildResults (fst bi)
+      uploadBuildResults (bi_buildNum bi)
       -- We've just been doing stuff for a long time
       -- potentially, so we could have overrun a scheduled
       -- build by a long time. In that case, we don't want
@@ -190,12 +189,15 @@ getBuildInstructions instructions
       return bi
 
 runBuildInstructions :: BuildInstructions -> ClientMonad ()
-runBuildInstructions (bn, bss)
+runBuildInstructions bi
  = do baseDir <- getBaseDir
-      let root = Client baseDir
+      let bn = bi_buildNum bi
+          bss = bi_buildSteps bi
+          root = Client baseDir
           buildDir = baseDir </> "builds" </> show bn
       liftIO $ createDirectory buildDir
       writeBuildResult root bn Incomplete
+      writeBuildInstructions root bn (bi_instructions bi)
       liftIO $ createDirectory (buildDir </> "steps")
       tempBuildDir <- getTempBuildDir
       liftIO $ ignoreDoesNotExist $ removeDirectoryRecursive tempBuildDir
@@ -287,8 +289,10 @@ uploadBuildResults bn
       mapM_ sendStep bsns
       liftIO $ removeDirectory stepsDir
       sendServer ("RESULT " ++ show bn)
+      sendString $ getMaybeBuildInstructions root bn
       sendString $ getMaybeBuildResult root bn
       getTheResponseCode respOK
+      removeBuildInstructions root bn
       removeBuildResult root bn
       liftIO $ removeDirectory buildDir
 

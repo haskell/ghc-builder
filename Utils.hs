@@ -13,10 +13,10 @@ module Utils (Response,
               getSortedNumericDirectoryContents,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
               Instructions(..),
-              getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo
+              getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
+              BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..)
              ) where
 
-import BuildStep
 import Handlelike
 
 import Control.Exception
@@ -226,4 +226,23 @@ mkUserInfo pass bt bis
           ui_buildTime = bt,
           ui_buildInstructions = bis
       }
+
+data BuildInstructions = BuildInstructions {
+                             bi_instructions :: Instructions,
+                             bi_buildNum :: BuildNum,
+                             bi_buildSteps :: [(BuildStepNum, BuildStep)]
+                         }
+    deriving (Show, Read)
+
+type BuildNum = Integer
+
+type BuildStepNum = Integer
+
+data BuildStep = BuildStep {
+                     bs_name :: String,
+                     bs_subdir :: FilePath,
+                     bs_prog :: FilePath,
+                     bs_args :: [String]
+                 }
+    deriving (Show, Read)
 

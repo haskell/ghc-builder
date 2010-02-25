@@ -4,7 +4,7 @@
 "RESET TIME"         ->             200
 "READY"              -> 201       + 200
 "UPLOAD 123 456"     -> 202 * 6   + 200
-"RESULT 123"         -> 202       + 200
+"RESULT 123"         -> 202 * 2   + 200
 "LAST UPLOADED"      -> 201       + 200
 _                    ->             500
 

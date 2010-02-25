@@ -1,7 +1,6 @@
 
 module Config (clients) where
 
-import BuildStep
 import Utils
 
 buildSteps :: [BuildStep]
