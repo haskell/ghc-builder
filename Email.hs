@@ -35,7 +35,7 @@ sendEmails u bn
                        "",
                        buildResult,
                        ""]
-                   ++ showTable [lPad, noPad]
+                   ++ showTable [rPad, noPad]
                                 steps
                    ++ ["",
                        buildResult,

@@ -250,7 +250,7 @@ data BuildStep = BuildStep {
 showTable :: [Int -> String -> String] -> [[String]] -> [String]
 showTable padders xss
     = let lengths = map (maximum . map length) $ transpose xss
-      in map (concat . intersperse " " . zipWith3 id padders lengths) xss
+      in map (concat . intersperse " | " . zipWith3 id padders lengths) xss
 
 noPad :: Int -> String -> String
 noPad _ str = str
