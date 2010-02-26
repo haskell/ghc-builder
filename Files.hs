@@ -29,7 +29,6 @@ module Files (
 import Utils
 
 import Control.Monad.Trans
-import Data.Maybe
 import System.Directory
 import System.Exit
 import System.FilePath
