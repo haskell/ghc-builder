@@ -106,28 +106,30 @@ startSsl v s nv
                  contextSetCAFile sslContext fpRootPem
                  ssl <- OpenSSL.Session.connection sslContext s
                  OpenSSL.Session.accept ssl
-                 user <- verifySsl ssl
+                 mUser <- verifySsl ssl
                  sendHandle v ssl respOK "Welcome to SSL"
-                 authClient v (Ssl ssl) nv (Just user)
+                 authClient v (Ssl ssl) nv mUser
           "NO SSL" ->
               do sendHandle v s respOK "OK, no SSL"
                  authClient v (Socket s) nv Nothing
           _ -> do sendHandle v s respHuh "Expected SSL instructions"
                   startSsl v s nv
 
-verifySsl :: SSL -> IO User
+verifySsl :: SSL -> IO (Maybe User)
 verifySsl ssl
  = do verified <- getVerifyResult ssl
       unless verified $ die "Certificate doesn't verify"
       mPeerCert <- getPeerCertificate ssl
       case mPeerCert of
           Nothing ->
-              die "No peer certificate"
+              -- XXX We're hitting this branch. Is that expected?
+              -- die "No peer certificate"
+              return Nothing
           Just peerCert ->
               do mapping <- getSubjectName peerCert False
                  case lookup "CN" mapping of
                      Just user ->
-                         return user
+                         return (Just user)
                      Nothing ->
                          die "Certificate has no CN"
 
