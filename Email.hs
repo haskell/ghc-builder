@@ -11,8 +11,8 @@ import Control.Monad
 import System.Exit
 import System.FilePath
 
-sendEmails :: User -> BuildNum -> IO ()
-sendEmails u bn
+sendEmails :: User -> BuildNum -> String -> IO ()
+sendEmails u bn url
  = do let buildsDir = baseDir </> "clients" </> u </> "builds"
           buildDir = buildsDir </> show bn
           stepsDir = buildDir </> "steps"
@@ -31,14 +31,17 @@ sendEmails u bn
                         Failure -> "Build failed"
                         Incomplete -> "Build incomplete"
           description = u ++ ", build " ++ show bn
+          link = "Details: " ++ url
           bodyLines = [description,
                        "",
                        buildResult,
+                       link,
                        ""]
                    ++ showTable [rPad, noPad]
                                 steps
                    ++ ["",
                        buildResult,
+                       link,
                        ""]
           subject = description
           body = unlines bodyLines

@@ -10,7 +10,7 @@ import Control.Concurrent.MVar
 notifier :: NVar -> IO ()
 notifier nv
  = do (user, bn) <- takeMVar nv
-      createWebPage user bn
-      sendEmails user bn
+      webpage <- createWebPage user bn
+      sendEmails user bn webpage
       notifier nv
 

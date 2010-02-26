@@ -1,5 +1,5 @@
 
-module Config (clients, fromAddress, emailAddresses) where
+module Config (clients, fromAddress, emailAddresses, urlRoot) where
 
 import Utils
 
@@ -8,6 +8,9 @@ fromAddress = "cvs-ghc@haskell.org"
 
 emailAddresses :: [String]
 emailAddresses = ["igloo@earth.li"]
+
+urlRoot :: String
+urlRoot = "http://darcs.haskell.org/ghcBuilder/"
 
 buildSteps :: [BuildStep]
 buildSteps = [BuildStep {

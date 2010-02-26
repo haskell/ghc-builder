@@ -2,6 +2,7 @@
 module WebpageCreation where
 
 import Command
+import Config
 import Files
 import ServerMonad
 import Utils
@@ -12,7 +13,7 @@ import System.Exit
 import System.FilePath
 import Text.XHtml.Strict
 
-createWebPage :: User -> BuildNum -> IO ()
+createWebPage :: User -> BuildNum -> IO String
 createWebPage u bn
  = do let buildsDir = baseDir </> "clients" </> u </> "builds"
           buildDir = buildsDir </> show bn
@@ -21,8 +22,9 @@ createWebPage u bn
       steps <- getSortedNumericDirectoryContents stepsDir
       createDirectory webBuildDir
       mapM_ (mkStepPage u bn) steps
-      mkBuildPage u bn steps
+      relPage <- mkBuildPage u bn steps
       mkIndex u
+      return (urlRoot </> relPage)
 
 mkStepPage :: User -> BuildNum -> BuildStepNum -> IO ()
 mkStepPage u bn bsn
@@ -76,10 +78,11 @@ mkStepPage u bn bsn
           str = renderHtml html
       writeBinaryFile page str
 
-mkBuildPage :: User -> BuildNum -> [BuildStepNum] -> IO ()
+mkBuildPage :: User -> BuildNum -> [BuildStepNum] -> IO String
 mkBuildPage u bn bsns
  = do let root = Server (baseDir </> "clients") u
-          page = baseDir </> "web/builders" </> u </> show bn <.> "html"
+          relPage = "builders" </> u </> show bn <.> "html"
+          page = baseDir </> "web" </> relPage
           mkLink bsn = do stepName <- readBuildStepName root bn bsn
                           ec <- readBuildStepExitcode root bn bsn
                           let linkClass = case ec of
@@ -109,6 +112,7 @@ mkBuildPage u bn bsns
                            noHtml
           str = renderHtml html
       writeBinaryFile page str
+      return relPage
 
 -- XXX This should do something:
 mkIndex :: User -> IO ()
