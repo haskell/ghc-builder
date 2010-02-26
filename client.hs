@@ -92,6 +92,7 @@ mainLoop
  = do sendServer "READY"
       getTheResponseCode respSizedThingFollows
       instructions <- readSizedThing
+      verbose ("Got instructions: " ++ show instructions)
       getTheResponseCode respOK
       case instructions of
           Idle ->

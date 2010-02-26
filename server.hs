@@ -244,6 +244,7 @@ handleClient = do talk
                                                   else return Idle
                                sendClient respSizedThingFollows "Your mission, should you choose to accept it, is to:"
                                sendSizedThing what
+                               verbose ("Sent instructions: " ++ show what)
                                sendClient respOK "Off you go"
                         _
                          | Just xs <- stripPrefix "UPLOAD " msg,
