@@ -4,7 +4,6 @@ module SendMail (sendMail) where
 import Codec.MIME.String.Flatten
 import Codec.MIME.String.Parse
 import Control.Concurrent
-import Control.Concurrent.MVar
 import Data.List
 import System.Exit
 import System.IO
@@ -29,8 +28,8 @@ sendMail from tos subject body maybeHtmlBody attachments
                                                      Nothing Nothing
       vout <- newEmptyMVar
       verr <- newEmptyMVar
-      forkIO $ hGetContents hout >>= putMVar vout
-      forkIO $ hGetContents herr >>= putMVar verr
+      _ <- forkIO $ hGetContents hout >>= putMVar vout
+      _ <- forkIO $ hGetContents herr >>= putMVar verr
       hPutStr hin mail
       hClose hin
       ec <- waitForProcess ph

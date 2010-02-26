@@ -18,7 +18,6 @@ import Utils
 import Control.Concurrent.MVar
 import Control.Monad.State
 import Data.Time.LocalTime
-import System.IO
 
 type NVar = MVar (User, BuildNum)
 

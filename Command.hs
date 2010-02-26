@@ -4,7 +4,6 @@ module Command where
 import Utils
 
 import Control.Concurrent
-import Control.Concurrent.MVar
 import Control.Exception
 import System.Exit
 import System.IO
@@ -31,15 +30,15 @@ run prog args outputFile
                                 Just line -> do hPutStrLn hOutput (show line)
                                                 writeLines n
                                 Nothing -> writeLines (n - 1)
-      forkIO $ (do hSetBuffering hOut LineBuffering
-                   getLines hOut Stdout `onEndOfFile` return ())
-                `finally`
-                putMVar mv Nothing
-      forkIO $ (do hSetBuffering hErr LineBuffering
-                   getLines hErr Stderr `onEndOfFile` return ())
-                `finally`
-                putMVar mv Nothing
-      forkIO $ writeLines 2
+      _ <- forkIO $ (do hSetBuffering hOut LineBuffering
+                        getLines hOut Stdout `onEndOfFile` return ())
+                     `finally`
+                     putMVar mv Nothing
+      _ <- forkIO $ (do hSetBuffering hErr LineBuffering
+                        getLines hErr Stderr `onEndOfFile` return ())
+                     `finally`
+                     putMVar mv Nothing
+      _ <- forkIO $ writeLines 2
 
       waitForProcess ph
 

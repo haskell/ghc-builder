@@ -26,7 +26,6 @@ import Prelude hiding (catch)
 import System.Directory
 import System.Environment
 import System.FilePath
-import System.IO
 
 main :: IO ()
 main = do args <- getArgs
@@ -67,7 +66,7 @@ runServer v =
                  `catch` \e ->
                      do verbose' v ("Notification thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
                         notifierThread
-       forkIO notifierThread
+       _ <- forkIO notifierThread
        addrinfos <- getAddrInfo Nothing Nothing (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
@@ -79,7 +78,7 @@ listenForClients v nv serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let mainLoop = do (conn, _) <- Network.Socket.accept sock
-                        forkIO $ startSsl v conn nv
+                        _ <- forkIO $ startSsl v conn nv
                         mainLoop
       mainLoop
 

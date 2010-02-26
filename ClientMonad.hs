@@ -9,7 +9,6 @@ import Handlelike
 import Utils
 
 import Control.Monad.State
-import System.IO
 
 newtype ClientMonad a = ClientMonad (StateT ClientState IO a)
     deriving (Monad, MonadIO)
