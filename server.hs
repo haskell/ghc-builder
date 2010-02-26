@@ -70,7 +70,7 @@ runServer v =
                      do verbose' v ("Notification thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
                         notifierThread
        _ <- forkIO notifierThread
-       addrinfos <- getAddrInfo Nothing Nothing (Just (show port))
+       addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
