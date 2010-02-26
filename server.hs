@@ -85,19 +85,25 @@ listenForClients v nv serveraddr sock
                         mainLoop
       mainLoop
 
+fpServerPem :: FilePath
+fpServerPem = "certs/server.pem"
+
+fpRootPem :: FilePath
+fpRootPem = "certs/root.pem"
+
 startSsl :: Verbosity -> Socket -> NVar -> IO ()
 startSsl v s nv
  = do msg <- hlGetLine' s
       when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
       case msg of
           "START SSL" ->
-              do serverPem <- readFile "server.pem"
+              do serverPem <- readFile fpServerPem
                  serverX509 <- readX509 serverPem
                  serverPrivateKey <- readPrivateKey serverPem (PwStr "password")
                  sslContext <- context
                  contextSetCertificate sslContext serverX509
                  contextSetPrivateKey sslContext serverPrivateKey
-                 contextSetCAFile sslContext "root.pem"
+                 contextSetCAFile sslContext fpRootPem
                  ssl <- OpenSSL.Session.connection sslContext s
                  OpenSSL.Session.accept ssl
                  user <- verifySsl ssl

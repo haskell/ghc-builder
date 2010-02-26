@@ -130,19 +130,25 @@ sendServer str = do verbose ("Sending: " ++ show str)
 wantSsl :: Bool
 wantSsl = True
 
+fpClientPem :: FilePath
+fpClientPem = "certs/client.pem"
+
+fpRootPem :: FilePath
+fpRootPem = "certs/root.pem"
+
 startSsl :: ClientMonad ()
 startSsl
  | wantSsl   = do h <- getHandle
                   case h of
                       Socket sock -> do
                           sendServer "START SSL"
-                          clientPem <- liftIO $ readFile "client.pem"
+                          clientPem <- liftIO $ readFile fpClientPem
                           clientX509 <- liftIO $ readX509 clientPem
                           clientPrivateKey <- liftIO $ readPrivateKey clientPem (PwStr "password")
                           sslContext <- liftIO $ context
                           liftIO $ contextSetCertificate sslContext clientX509
                           liftIO $ contextSetPrivateKey sslContext clientPrivateKey
-                          liftIO $ contextSetCAFile sslContext "root.pem"
+                          liftIO $ contextSetCAFile sslContext fpRootPem
                           ssl <- liftIO $ OpenSSL.Session.connection sslContext sock
                           liftIO $ OpenSSL.Session.connect ssl
                           verifySsl ssl
