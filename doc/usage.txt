@@ -1,5 +1,22 @@
 
-TODO: These instructions need to be updated with how to set up the SSL certs
+SSL keys and certificates
+=========================
+
+All SSL keys/certificates generated expire after 30 years. They are
+only protected with a password of "password", so you will need to use
+file permissions to keep them secret.
+
+In certs/ run "mkRoot.sh". This will create
+    ca_key.pem  Used to make the SSL keys for the client and server
+    root.pem    Used by clients to check that the server cert is valid
+
+In certs/ run "mkServerKey.sh hostname" where hostname is the name that
+your clients will connect to (e.g. "darcs.haskell.org"). This will
+create
+    server.pem  The server's key
+
+In certs/ run "mkClientKey.sh clientusername". This will create
+    client.pem  The key for that client
 
 Server
 ======
