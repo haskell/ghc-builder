@@ -42,6 +42,8 @@ initServer = do -- XXX We really ought to catch an already-exists
                 -- exception and handle it properly
                 createDirectory baseDir
                 createDirectory (baseDir </> "clients")
+                createDirectory (baseDir </> "web")
+                createDirectory (baseDir </> "web" </> "builders")
 
 addClient :: String -> IO ()
 addClient client
