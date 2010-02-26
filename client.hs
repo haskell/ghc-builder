@@ -168,7 +168,7 @@ verifySsl ssl
                          do host <- getHost
                             unless (host == host') $ die "Certificate is for the wrong host"
                      Nothing ->
-                         die "Certificate has no host"
+                         die "Certificate has no CN"
 
 authenticate :: ClientMonad ()
 authenticate = do dir <- getBaseDir

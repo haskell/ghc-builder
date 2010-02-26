@@ -16,12 +16,13 @@ import Control.Monad
 import Control.Monad.Trans
 import Data.Char
 import Data.List
+import Data.Maybe
 import Data.Time.LocalTime
 import Network.Socket
 import OpenSSL
 import OpenSSL.PEM
 import OpenSSL.Session
--- import OpenSSL.X509
+import OpenSSL.X509
 import Prelude hiding (catch)
 import System.Directory
 import System.Environment
@@ -88,31 +89,42 @@ startSsl v s nv
       when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
       case msg of
           "START SSL" ->
-              do -- rootPem <- readFile "root.pem"
-                 serverPem <- readFile "server.pem"
-                 -- rootX509 <- readX509 rootPem
+              do serverPem <- readFile "server.pem"
                  serverX509 <- readX509 serverPem
                  serverPrivateKey <- readPrivateKey serverPem (PwStr "password")
-                 -- verf <- verifyX509 rootX509 serverPrivateKey
                  sslContext <- context
                  contextSetCertificate sslContext serverX509
                  contextSetPrivateKey sslContext serverPrivateKey
-                 -- contextCheckPrivateKey sslContext
                  contextSetCAFile sslContext "root.pem"
                  ssl <- OpenSSL.Session.connection sslContext s
                  OpenSSL.Session.accept ssl
-                 -- mpc <- getPeerCertificate ssl
-                 -- getVerifyResult ssl
+                 user <- verifySsl ssl
                  sendHandle v ssl respOK "Welcome to SSL"
-                 authClient v (Ssl ssl) nv
+                 authClient v (Ssl ssl) nv (Just user)
           "NO SSL" ->
               do sendHandle v s respOK "OK, no SSL"
-                 authClient v (Socket s) nv
+                 authClient v (Socket s) nv Nothing
           _ -> do sendHandle v s respHuh "Expected SSL instructions"
                   startSsl v s nv
 
-authClient :: Verbosity -> HandleOrSsl -> NVar -> IO ()
-authClient v h nv
+verifySsl :: SSL -> IO User
+verifySsl ssl
+ = do verified <- getVerifyResult ssl
+      unless verified $ die "Certificate doesn't verify"
+      mPeerCert <- getPeerCertificate ssl
+      case mPeerCert of
+          Nothing ->
+              die "No peer certificate"
+          Just peerCert ->
+              do mapping <- getSubjectName peerCert False
+                 case lookup "CN" mapping of
+                     Just user ->
+                         return user
+                     Nothing ->
+                         die "Certificate has no CN"
+
+authClient :: Verbosity -> HandleOrSsl -> NVar -> Maybe User -> IO ()
+authClient v h nv mu
  = do msg <- hlGetLine' h
       when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
       case stripPrefix "AUTH " msg of
@@ -120,28 +132,34 @@ authClient v h nv
               case break (' ' ==) xs of
                   (user, ' ' : pass) ->
                       case lookup user clients of
+                      Nothing ->
+                          authFailed ("User " ++ show user ++ " unknown")
                       Just ui
-                       | ui_password ui == pass ->
+                       | ui_password ui /= pass ->
+                          authFailed "Wrong password"
+                       | isJust mu && (Just user /= mu) ->
+                          authFailed "User doesn't match SSL certificate CN"
+                       | otherwise ->
                           do tod <- getTOD
                              sendHandle v h respOK "authenticated"
                              let serverState = mkServerState
                                                    h user v nv tod ui
                              evalServerMonad handleClient serverState
-                      _ ->
-                          do sendHandle v h respAuthFailed "auth failed"
-                             authClient v h nv
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h nv
+                         authClient v h nv mu
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h nv
+                         authClient v h nv mu
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h nv
+                         authClient v h nv mu
+    where authFailed reason = do verbose' v ("Auth failed: " ++ reason)
+                                 sendHandle v h respAuthFailed "auth failed"
+                                 authClient v h nv mu
 
 verbose :: String -> ServerMonad ()
 verbose str = do v <- getVerbosity
