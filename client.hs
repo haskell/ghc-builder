@@ -64,7 +64,7 @@ runClient v = do curDir <- getCurrentDirectory
 
                    let client = mkClientState v host baseDir (Socket s)
                    evalClientMonad doClient client
-              `onEndOfFile` connLoop baseDir host
+              `onConnectionDropped` connLoop baseDir host
 
           conn host secs
               = do verbose' v "Connecting..."

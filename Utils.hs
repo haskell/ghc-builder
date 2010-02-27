@@ -12,6 +12,7 @@ module Utils (Response,
               readSizedThing, sendSizedThing,
               getSortedNumericDirectoryContents,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
+              onConnectionDropped,
               Instructions(..),
               getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
               BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
@@ -194,6 +195,14 @@ onEndOfFile :: IO a -> IO a -> IO a
 onEndOfFile io io' = io `catch` \e -> if isEOFError e
                                       then io'
                                       else throwIO e
+
+onConnectionDropped :: IO a -> IO a -> IO a
+onConnectionDropped io io'
+ = io `catch` \e ->
+   if isEOFError e ||
+      (isUserError e && ("SSL" `isPrefixOf` ioeGetErrorString e))
+   then io'
+   else throwIO e
 
 getTOD :: MonadIO m => m TimeOfDay
 getTOD = do t <- liftIO $ getCurrentTime
