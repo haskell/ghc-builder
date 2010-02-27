@@ -57,14 +57,14 @@ runClient :: Verbosity -> IO ()
 runClient v = do curDir <- getCurrentDirectory
                  let baseDir = curDir </> baseSubDir
                  host <- readBinaryFile (baseDir </> "host")
-                 connLoop baseDir host
-    where connLoop baseDir host
+                 connLoop curDir baseDir host
+    where connLoop curDir baseDir host
               = do s <- conn host 5
                    verbose' v "Connected."
 
                    let client = mkClientState v host baseDir (Socket s)
-                   evalClientMonad doClient client
-              `onConnectionDropped` connLoop baseDir host
+                   evalClientMonad (doClient curDir) client
+              `onConnectionDropped` connLoop curDir baseDir host
 
           conn host secs
               = do verbose' v "Connecting..."
@@ -81,11 +81,12 @@ runClient v = do curDir <- getCurrentDirectory
                       Network.Socket.connect sock (addrAddress serveraddr)
                       return sock
 
-doClient :: ClientMonad ()
-doClient = do startSsl
-              authenticate
-              uploadAllBuildResults
-              mainLoop
+doClient :: FilePath -> ClientMonad ()
+doClient curDir
+ = do startSsl curDir
+      authenticate
+      uploadAllBuildResults
+      mainLoop
 
 mainLoop :: ClientMonad ()
 mainLoop
@@ -137,19 +138,19 @@ fpClientPem = "certs/client.pem"
 fpRootPem :: FilePath
 fpRootPem = "certs/root.pem"
 
-startSsl :: ClientMonad ()
-startSsl
+startSsl :: FilePath -> ClientMonad ()
+startSsl curDir
  | wantSsl   = do h <- getHandle
                   case h of
                       Socket sock -> do
                           sendServer "START SSL"
-                          clientPem <- liftIO $ readFile fpClientPem
+                          clientPem <- liftIO $ readFile (curDir </> fpClientPem)
                           clientX509 <- liftIO $ readX509 clientPem
                           clientPrivateKey <- liftIO $ readPrivateKey clientPem (PwStr "password")
                           sslContext <- liftIO $ context
                           liftIO $ contextSetCertificate sslContext clientX509
                           liftIO $ contextSetPrivateKey sslContext clientPrivateKey
-                          liftIO $ contextSetCAFile sslContext fpRootPem
+                          liftIO $ contextSetCAFile sslContext (curDir </> fpRootPem)
                           ssl <- liftIO $ OpenSSL.Session.connection sslContext sock
                           liftIO $ OpenSSL.Session.connect ssl
                           verifySsl ssl
