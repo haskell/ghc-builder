@@ -46,6 +46,7 @@ initClient :: String -> String -> String -> IO ()
 initClient user pass host
  = do -- XXX We really ought to catch an already-exists
       -- exception and handle it properly
+      createDirectory "certs"
       createDirectory baseSubDir
       createDirectory (baseSubDir </> "builds")
       writeBinaryFile (baseSubDir </> "user") user
