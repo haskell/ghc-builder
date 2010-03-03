@@ -15,9 +15,6 @@ your clients will connect to (e.g. "darcs.haskell.org"). This will
 create
     server.pem  The server's key
 
-In certs/ run "mkClientKey.sh clientusername". This will create
-    client.pem  The key for that client
-
 Server
 ======
 
