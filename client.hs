@@ -13,7 +13,6 @@ import Control.Concurrent
 import Control.Monad.State
 import Network.Socket
 import OpenSSL
-import OpenSSL.PEM
 import OpenSSL.Session
 import OpenSSL.X509
 import Prelude hiding (catch)
@@ -132,9 +131,6 @@ sendServer str = do verbose ("Sending: " ++ show str)
 wantSsl :: Bool
 wantSsl = True
 
-fpClientPem :: FilePath
-fpClientPem = "certs/client.pem"
-
 fpRootPem :: FilePath
 fpRootPem = "certs/root.pem"
 
@@ -144,12 +140,7 @@ startSsl curDir
                   case h of
                       Socket sock -> do
                           sendServer "START SSL"
-                          clientPem <- liftIO $ readFile (curDir </> fpClientPem)
-                          clientX509 <- liftIO $ readX509 clientPem
-                          clientPrivateKey <- liftIO $ readPrivateKey clientPem (PwStr "password")
                           sslContext <- liftIO $ context
-                          liftIO $ contextSetCertificate sslContext clientX509
-                          liftIO $ contextSetPrivateKey sslContext clientPrivateKey
                           liftIO $ contextSetCAFile sslContext (curDir </> fpRootPem)
                           ssl <- liftIO $ OpenSSL.Session.connection sslContext sock
                           liftIO $ OpenSSL.Session.connect ssl
