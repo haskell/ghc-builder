@@ -28,6 +28,8 @@ import System.Directory
 import System.Environment
 import System.FilePath
 import System.IO
+import System.Locale
+import System.Time
 
 main :: IO ()
 main = do hSetBuffering stdout LineBuffering
@@ -72,7 +74,7 @@ runServer v =
        let notifierThread
                = notifier notifierVar
                  `catch` \e ->
-                     do verbose' v ("Notification thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
+                     do verbose' v Notifier ("Notification thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
                         notifierThread
        _ <- forkIO notifierThread
        addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
@@ -172,21 +174,35 @@ authClient v h nv mu
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
                          authClient v h nv mu
-    where authFailed reason = do verbose' v ("Auth failed: " ++ reason)
+    where authFailed reason = do verbose' v Unauthed ("Auth failed: " ++ reason)
                                  sendHandle v h respAuthFailed "auth failed"
                                  authClient v h nv mu
 
 verbose :: String -> ServerMonad ()
 verbose str = do v <- getVerbosity
-                 liftIO $ verbose' v str
+                 u <- getUser
+                 liftIO $ verbose' v (User u) str
 
-verbose' :: Verbosity -> String -> IO ()
-verbose' v str = when (v >= Verbose) $ putStrLn str
+verbose' :: Verbosity -> Who -> String -> IO ()
+verbose' v w str
+ = when (v >= Verbose) $
+       do clockTime <- getClockTime
+          calendarTime <- toCalendarTime clockTime
+          let fmt = "[%Y-%m-%d %H:%M:%s]"
+              t = formatCalendarTime defaultTimeLocale fmt calendarTime
+          putStrLn (unwords [t, pprWho w, str])
+
+data Who = User User | Unauthed | Notifier
+
+pprWho :: Who -> String
+pprWho (User u) = "[U:" ++ u ++ "]"
+pprWho Unauthed = "[unauthed]"
+pprWho Notifier = "[notifier]"
 
 sendHandle :: Handlelike h => Verbosity -> h -> Response -> String -> IO ()
 sendHandle v h resp str
  = do let respStr = show resp ++ " " ++ str
-      verbose' v ("Sending: " ++ show respStr)
+      verbose' v Unauthed ("Sending: " ++ show respStr)
       hlPutStrLn' h respStr
 
 sendClient :: Response -> String -> ServerMonad ()
