@@ -20,6 +20,7 @@ import System.Directory
 import System.Environment
 import System.Exit
 import System.FilePath
+import System.IO
 
 baseSubDir :: FilePath
 baseSubDir = "builder"
@@ -33,7 +34,9 @@ getBuildResultFile bn = do dir <- getBaseDir
                            return (dir </> "builds" </> show bn </> "result")
 
 main :: IO ()
-main = do args <- getArgs
+main = do hSetBuffering stdout LineBuffering
+          hSetBuffering stderr LineBuffering
+          args <- getArgs
           case args of
               []       -> withSocketsDo $ withOpenSSL $ runClient Normal
               ["-v"]   -> withSocketsDo $ withOpenSSL $ runClient Verbose

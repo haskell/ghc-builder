@@ -27,9 +27,12 @@ import Prelude hiding (catch)
 import System.Directory
 import System.Environment
 import System.FilePath
+import System.IO
 
 main :: IO ()
-main = do args <- getArgs
+main = do hSetBuffering stdout LineBuffering
+          hSetBuffering stderr LineBuffering
+          args <- getArgs
           case args of
               []              -> withSocketsDo $ withOpenSSL $ runServer Normal
               ["-v"]          -> withSocketsDo $ withOpenSSL $ runServer Verbose
