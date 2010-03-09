@@ -41,4 +41,6 @@ run prog args outputFile
       _ <- forkIO $ writeLines 2
 
       waitForProcess ph
+ `onDoesNotExist`
+    return (ExitFailure 1)
 
