@@ -48,7 +48,8 @@ initServer = do -- XXX We really ought to catch an already-exists
 addClient :: String -> IO ()
 addClient client
  | null client = die "Null client name!"
- | not (all isAlpha client) = die "Bad client name"
+ | not (isAlpha (head client)) = die "Bad client name"
+ | not (all isOKChar client) = die "Bad client name"
  | otherwise = do -- XXX We really ought to catch an already-exists
                   -- exception and handle it properly
                   let clientDir = baseDir </> "clients" </> client
@@ -60,6 +61,7 @@ addClient client
                               (0 :: BuildNum)
                   createDirectory (baseDir </> "web/builders" </> client)
                   putStrLn "OK, client added"
+    where isOKChar c = isAlpha c || c == '-' || c == '_'
 
 runServer :: Verbosity -> IO ()
 runServer v =
