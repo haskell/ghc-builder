@@ -3,7 +3,7 @@ module Utils (Response,
               respOK, respSizedThingFollows, respSendSizedThing,
               respHuh, respAuthFailed,
               User, Pass, port, Verbosity (..), Result(..),
-              die, maybeRead,
+              die, maybeRead, maybeReadSpace,
               readBinaryFile, maybeReadBinaryFile,
               writeBinaryFile, maybeWriteBinaryFile,
               readFromFile, maybeReadFromFile,
@@ -24,6 +24,7 @@ import Handlelike
 import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
+import Data.Char
 import Data.List
 import Data.Time.Clock
 import Data.Time.LocalTime
@@ -70,6 +71,11 @@ maybeRead :: Read a => String -> Maybe a
 maybeRead str = case reads str of
                 [(x, "")] -> Just x
                 _ -> Nothing
+
+maybeReadSpace :: Read a => String -> Maybe a
+maybeReadSpace str = case reads str of
+                     [(x, ys)] | all isSpace ys -> Just x
+                     _ -> Nothing
 
 readBinaryFile :: MonadIO m => FilePath -> m String
 readBinaryFile fp = do h <- liftIO $ openBinaryFile fp ReadMode

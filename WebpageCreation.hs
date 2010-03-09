@@ -65,7 +65,7 @@ mkStepPage u bn bsn
                   stringToHtml "Subdir: "  +++ maybeToShowHtml msubdir)
           outputHtml = (pre ! [theclass "output"])
                            (concatHtml $ map doLine output)
-          doLine lineStr = case maybeRead lineStr of
+          doLine lineStr = case maybeReadSpace lineStr of
                            Just (Stdout line) ->
                                (thediv ! [theclass "stdout"])
                                    (stringToHtml line)
