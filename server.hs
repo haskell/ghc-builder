@@ -188,7 +188,7 @@ verbose' v w str
  = when (v >= Verbose) $
        do clockTime <- getClockTime
           calendarTime <- toCalendarTime clockTime
-          let fmt = "[%Y-%m-%d %H:%M:%s]"
+          let fmt = "[%Y-%m-%d %H:%M:%S]"
               t = formatCalendarTime defaultTimeLocale fmt calendarTime
           putStrLn (unwords [t, pprWho w, str])
 
