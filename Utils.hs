@@ -12,7 +12,7 @@ module Utils (Response,
               readSizedThing, sendSizedThing,
               getSortedNumericDirectoryContents,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
-              onConnectionDropped,
+              onConnectionDropped, onConnectionFailed,
               Instructions(..),
               getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
               BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
@@ -190,6 +190,14 @@ onDoesNotExist :: IO a -> IO a -> IO a
 onDoesNotExist io io' = io `catch` \e -> if isDoesNotExistError e
                                          then io'
                                          else throwIO e
+
+onConnectionFailed :: IO a -> IO a -> IO a
+onConnectionFailed io io'
+ = io `catch` \e ->
+   if isDoesNotExistError e ||
+      (isUserError e && ("Connection refused" `isPrefixOf` ioeGetErrorString e))
+   then io'
+   else throwIO e
 
 onEndOfFile :: IO a -> IO a -> IO a
 onEndOfFile io io' = io `catch` \e -> if isEOFError e

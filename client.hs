@@ -71,7 +71,7 @@ runClient v = do curDir <- getCurrentDirectory
 
           conn host secs
               = do verbose' v "Connecting..."
-                   c host `onDoesNotExist`
+                   c host `onConnectionFailed`
                           do verbose' v ("Failed...sleeping for " ++ show secs ++ " seconds...")
                              threadDelay (secs * 1000000)
                              conn host ((secs * 2) `min` 600)
