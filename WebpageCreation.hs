@@ -43,8 +43,11 @@ mkStepPage u bn bsn
       mprog     <- readMaybeBuildStepProg     root bn bsn
       margs     <- readMaybeBuildStepArgs     root bn bsn
       mec       <- readMaybeBuildStepExitcode root bn bsn
-      output <- liftM lines $ readBinaryFile (stepDir </> "output")
-      let descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
+      moutput   <- maybeReadBinaryFile (stepDir </> "output")
+      let output = case moutput of
+                   Just x -> lines x
+                   Nothing -> []
+          descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
           html = header headerHtml
              +++ body bodyHtml
           bodyHtml = h1 descriptionHtml
