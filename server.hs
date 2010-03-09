@@ -64,7 +64,7 @@ addClient client
                               (0 :: BuildNum)
                   createDirectory (baseDir </> "web/builders" </> client)
                   putStrLn "OK, client added"
-    where isOKChar c = isAlpha c || c == '-' || c == '_'
+    where isOKChar c = isAlphaNum c || c == '-' || c == '_'
 
 runServer :: Verbosity -> IO ()
 runServer v =
