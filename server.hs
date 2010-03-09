@@ -101,7 +101,7 @@ fpRootPem = "certs/root.pem"
 startSsl :: Verbosity -> Socket -> NVar -> IO ()
 startSsl v s nv
  = do msg <- hlGetLine' s
-      when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
+      verbose' v Unauthed ("Received: " ++ show msg)
       case msg of
           "START SSL" ->
               do serverPem <- readFile fpServerPem
@@ -143,7 +143,7 @@ verifySsl ssl
 authClient :: Verbosity -> HandleOrSsl -> NVar -> Maybe User -> IO ()
 authClient v h nv mu
  = do msg <- hlGetLine' h
-      when (v >= Verbose) $ putStrLn ("Received: " ++ show msg)
+      verbose' v Unauthed ("Received: " ++ show msg)
       case stripPrefix "AUTH " msg of
           Just xs ->
               case break (' ' ==) xs of
@@ -215,10 +215,8 @@ handleClient :: ServerMonad ()
 handleClient = do talk
                   handleClient
     where talk :: ServerMonad ()
-          talk = do v <- getVerbosity
-                    msg <- hlGetLine
-                    liftIO $ when (v >= Verbose) $
-                        putStrLn ("Received: " ++ show msg)
+          talk = do msg <- hlGetLine
+                    verbose ("Received: " ++ show msg)
                     case msg of
                         -- XXX "HELP"
                         "BUILD INSTRUCTIONS" ->
