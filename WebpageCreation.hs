@@ -7,7 +7,6 @@ import Files
 import ServerMonad
 import Utils
 
-import Control.Monad
 import System.Directory
 import System.Exit
 import System.FilePath
