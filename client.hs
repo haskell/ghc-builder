@@ -36,6 +36,7 @@ getBuildResultFile bn = do dir <- getBaseDir
 main :: IO ()
 main = do hSetBuffering stdout LineBuffering
           hSetBuffering stderr LineBuffering
+          unless rtsSupportsBoundThreads $ die "Not linked with -threaded"
           args <- getArgs
           case args of
               []       -> withSocketsDo $ withOpenSSL $ runClient Normal
