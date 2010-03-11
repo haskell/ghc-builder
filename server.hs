@@ -162,6 +162,8 @@ authClient v h nv mu
                              let serverState = mkServerState
                                                    h user v nv tod ui
                              evalServerMonad handleClient serverState
+                                 `finally`
+                                 verbose' v (User user) "Disconnected"
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
                          authClient v h nv mu
