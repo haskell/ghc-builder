@@ -201,7 +201,10 @@ onConnectionFailed :: IO a -> IO a -> IO a
 onConnectionFailed io io'
  = io `catch` \e ->
    if isDoesNotExistError e ||
-      (isUserError e && ("Connection refused" `isPrefixOf` ioeGetErrorString e))
+      -- ioeGetErrorString only gets the right field for user errors,
+      -- so we need to change the error type first. Sigh.
+      ("Connection refused (WSAECONNREFUSED)" ==
+       ioeGetErrorString (ioeSetErrorType e userErrorType))
    then io'
    else throwIO e
 
