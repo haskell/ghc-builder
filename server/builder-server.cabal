@@ -1,0 +1,32 @@
+Name: builder-server
+Version: 0.1
+Copyright: 2010, The University Court of the University of Glasgow.
+License: BSD3
+License-File: ../LICENSE
+Author: Ian Lynagh <igloo@earth.li>
+Maintainer: cvs-ghc@haskell.org
+Synopsis: Builder server.
+Description:
+	Builder server.
+Category: Development
+build-type: Simple
+cabal-version: >=1.2
+
+Executable builder-server
+    Main-Is: server.hs
+    Hs-Source-Dirs: . ../common/
+
+    Build-Depends: base        >= 4   && < 5,
+                   bytestring  >= 0.9 && < 0.10,
+                   directory   >= 1.0 && < 1.3,
+                   filepath    >= 1.1 && < 1.2,
+                   HsOpenSSL   >= 0.8 && < 0.9,
+                   mime-string >= 0.4 && < 0.5,
+                   mtl         >= 1.1 && < 1.2,
+                   network     >= 2.2 && < 2.3,
+                   process     >= 1.0 && < 1.1,
+                   time        >= 1.1 && < 1.2,
+                   xhtml       >= 3000.2 && < 3000.3,
+                   old-locale  >= 1.0 && < 1.1,
+                   old-time    >= 1.0 && < 1.1
+
