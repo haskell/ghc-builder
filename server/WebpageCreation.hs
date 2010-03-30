@@ -19,6 +19,8 @@ createWebPage u bn
           stepsDir = buildDir </> "steps"
           webBuildDir = baseDir </> "web/builders" </> u </> show bn
       steps <- getSortedNumericDirectoryContents stepsDir
+               `onDoesNotExist`
+               return []
       createDirectory webBuildDir
       mapM_ (mkStepPage u bn) steps
       relPage <- mkBuildPage u bn steps
