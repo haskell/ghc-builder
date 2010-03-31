@@ -203,8 +203,9 @@ onConnectionFailed io io'
    if isDoesNotExistError e ||
       -- ioeGetErrorString only gets the right field for user errors,
       -- so we need to change the error type first. Sigh.
-      ("Connection refused (WSAECONNREFUSED)" ==
-       ioeGetErrorString (ioeSetErrorType e userErrorType))
+      (ioeGetErrorString (ioeSetErrorType e userErrorType) `elem`
+       ["Connection refused (WSAECONNREFUSED)",
+        "Connection timed out (WSAETIMEDOUT)"])
    then io'
    else throwIO e
 
