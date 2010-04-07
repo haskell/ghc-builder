@@ -355,12 +355,12 @@ mkBuildInstructions instructions bn buildSteps
 
 scheduledTimePassed :: TimeOfDay -> TimeOfDay -> TimeOfDay -> Bool
 scheduledTimePassed lastTime curTime scheduledTime
-    = (lastTime < scheduledTime) &&
-      (-- the simple case, where the time has passed:
-       (curTime >= scheduledTime) ||
-       -- the tricky case, where the time has passed,
-       -- but then the clock has wrapped:
-       (curTime < lastTime))
+      -- the simple case, where the time has passed:
+    = ((lastTime < scheduledTime) && (scheduledTime <= curTime))
+      -- the time has passed, but then the clock has wrapped:
+   || ((lastTime < scheduledTime) && (curTime < lastTime))
+      -- the clock has wrapped, then the time has passed:
+   || ((scheduledTime <= curTime) && (curTime < lastTime))
 
 -- getTODinTZ ought to be in Utils, but by putting it here we don't have
 -- to worry about whether setEnv and tzset exist on the client platforms
