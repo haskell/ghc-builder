@@ -35,14 +35,17 @@ buildSteps = [BuildStep {
 clients :: [(String, UserInfo)]
 clients = [("foo",
             mkUserInfo "mypass"
+                       "UTC"
                        (Timed (mkTime 2 0))
                        buildSteps),
            ("bar",
             mkUserInfo "mypass"
+                       "UTC"
                        Continuous
                        buildSteps),
            ("ghcBuilder",
             mkUserInfo "mypass"
+                       "UTC"
                        (Timed (mkTime 13 55))
                        ghcBuildSteps)
           ]

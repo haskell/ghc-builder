@@ -14,7 +14,7 @@ module Utils (Response,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
               onConnectionDropped, onConnectionFailed,
               Instructions(..),
-              getTOD, mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
+              mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
               BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
               showTable, noPad, lPad, rPad
              ) where
@@ -222,10 +222,6 @@ onConnectionDropped io io'
    then io'
    else throwIO e
 
-getTOD :: MonadIO m => m TimeOfDay
-getTOD = do t <- liftIO $ getCurrentTime
-            return $ timeToTimeOfDay $ utctDayTime t
-
 mkTime :: Int -> Int -> TimeOfDay
 mkTime hour mins = TimeOfDay {
                        todHour = hour,
@@ -235,6 +231,7 @@ mkTime hour mins = TimeOfDay {
 
 data UserInfo = UserInfo {
                     ui_password :: String,
+                    ui_timezone :: String,
                     ui_buildTime :: BuildTime,
                     ui_buildInstructions :: [BuildStep]
                 }
@@ -247,10 +244,11 @@ data BuildTime = Timed TimeOfDay
                | Continuous
     deriving (Show, Read)
 
-mkUserInfo :: String -> BuildTime -> [BuildStep] -> UserInfo
-mkUserInfo pass bt bis
+mkUserInfo :: String -> String -> BuildTime -> [BuildStep] -> UserInfo
+mkUserInfo pass tz bt bis
     = UserInfo {
           ui_password = pass,
+          ui_timezone = tz,
           ui_buildTime = bt,
           ui_buildInstructions = bis
       }

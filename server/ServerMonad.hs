@@ -5,7 +5,7 @@ module ServerMonad (
                     ServerMonad, evalServerMonad, mkServerState,
                     getVerbosity, getUser,
                     getLastReadyTime, setLastReadyTime,
-                    getScheduledBuildTime, getBuildInstructions,
+                    getTimezone, getScheduledBuildTime, getBuildInstructions,
                     getNotifierVar,
                     -- XXX Don't really belong here:
                     NVar,
@@ -71,6 +71,10 @@ getLastReadyTime = do st <- ServerMonad get
 setLastReadyTime :: TimeOfDay -> ServerMonad ()
 setLastReadyTime tod = do st <- ServerMonad get
                           ServerMonad $ put $ st { ss_last_ready_time = tod }
+
+getTimezone :: ServerMonad String
+getTimezone = do st <- ServerMonad get
+                 return $ ui_timezone $ ss_user_info st
 
 getScheduledBuildTime :: ServerMonad BuildTime
 getScheduledBuildTime = do st <- ServerMonad get

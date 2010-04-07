@@ -1,5 +1,5 @@
 
-{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE PatternGuards, ForeignFunctionInterface #-}
 
 module Main where
 
@@ -29,6 +29,7 @@ import System.Environment
 import System.FilePath
 import System.IO
 import System.Locale
+import System.Posix.Env
 import System.Time
 
 main :: IO ()
@@ -157,7 +158,7 @@ authClient v h nv mu
                        | isJust mu && (Just user /= mu) ->
                           authFailed "User doesn't match SSL certificate CN"
                        | otherwise ->
-                          do tod <- getTOD
+                          do tod <- getTODinTZ (ui_timezone ui)
                              sendHandle v h respOK "authenticated"
                              let serverState = mkServerState
                                                    h user v nv tod ui
@@ -247,18 +248,19 @@ handleClient = do talk
                                sendSizedThing (lastBuildNum :: BuildNum)
                                sendClient respOK "That's it"
                         "RESET TIME" ->
-                            do current <- getTOD
+                            do tz <- getTimezone
+                               current <- getTODinTZ tz
                                setLastReadyTime current
                                sendClient respOK "Done"
                         "READY" ->
-                            do
-                               scheduled <- getScheduledBuildTime
+                            do scheduled <- getScheduledBuildTime
                                what <- case scheduled of
                                        Continuous ->
                                            return (StartBuild Continuous)
                                        Timed tod ->
                                            do prev <- getLastReadyTime
-                                              current <- getTOD
+                                              tz <- getTimezone
+                                              current <- getTODinTZ tz
                                               setLastReadyTime current
                                               if scheduledTimePassed prev current tod
                                                   then return (StartBuild scheduled)
@@ -359,4 +361,15 @@ scheduledTimePassed lastTime curTime scheduledTime
        -- the tricky case, where the time has passed,
        -- but then the clock has wrapped:
        (curTime < lastTime))
+
+-- getTODinTZ ought to be in Utils, but by putting it here we don't have
+-- to worry about whether setEnv and tzset exist on the client platforms
+
+getTODinTZ :: MonadIO m => String -> m TimeOfDay
+getTODinTZ tz = do liftIO $ setEnv "TZ" tz True
+                   liftIO tzset
+                   t <- liftIO getZonedTime
+                   return $ localTimeOfDay $ zonedTimeToLocalTime t
+
+foreign import ccall "time.h tzset" tzset :: IO ()
 

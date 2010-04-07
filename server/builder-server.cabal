@@ -27,6 +27,7 @@ Executable builder-server
                    network     >= 2.2 && < 2.3,
                    process     >= 1.0 && < 1.1,
                    time        >= 1.1 && < 1.2,
+                   unix        >= 2.3 && < 2.5,
                    xhtml       >= 3000.2 && < 3000.3,
                    old-locale  >= 1.0 && < 1.1,
                    old-time    >= 1.0 && < 1.1
