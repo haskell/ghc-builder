@@ -43,7 +43,7 @@ sendEmails u bn url
                        buildResult,
                        link,
                        ""]
-          subject = description
+          subject = description ++ ", " ++ show result
           body = unlines bodyLines
       unless (null emailAddresses) $
           sendMail fromAddress emailAddresses subject body Nothing []
