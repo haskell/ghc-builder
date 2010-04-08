@@ -26,7 +26,6 @@ import Control.Monad
 import Control.Monad.Trans
 import Data.Char
 import Data.List
-import Data.Time.Clock
 import Data.Time.LocalTime
 import Prelude hiding (catch)
 import System.Directory
