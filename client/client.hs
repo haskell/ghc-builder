@@ -10,6 +10,7 @@ import Handlelike
 import Utils
 
 import Control.Concurrent
+import Control.Exception
 import Control.Monad.State
 import Network.Socket
 import OpenSSL
@@ -21,6 +22,7 @@ import System.Environment
 import System.Exit
 import System.FilePath
 import System.IO
+import System.IO.Error hiding (catch)
 
 baseSubDir :: FilePath
 baseSubDir = "builder"
@@ -203,7 +205,12 @@ runBuildInstructions bi
       writeBuildInstructions root bn (bi_instructions bi)
       liftIO $ createDirectory (buildDir </> "steps")
       tempBuildDir <- getTempBuildDir
-      liftIO $ ignoreDoesNotExist $ removeDirectoryRecursive tempBuildDir
+      liftIO $ removeDirectoryRecursive tempBuildDir
+               `catch` \e ->
+               if isDoesNotExistError e then return ()
+               else do when (isPermissionError e) $
+                           die ("Permission denied when removing " ++ show tempBuildDir ++ "\n" ++ show e)
+                       throwIO e
       liftIO $ createDirectory tempBuildDir
       runBuildSteps bn bss
 
