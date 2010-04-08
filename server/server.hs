@@ -255,6 +255,8 @@ handleClient = do talk
                         "READY" ->
                             do scheduled <- getScheduledBuildTime
                                what <- case scheduled of
+                                       Other why ->
+                                           return (StartBuild (Other why))
                                        Continuous ->
                                            return (StartBuild Continuous)
                                        Timed tod ->

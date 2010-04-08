@@ -241,6 +241,7 @@ data Instructions = Idle
 
 data BuildTime = Timed TimeOfDay
                | Continuous
+               | Other String
     deriving (Show, Read)
 
 mkUserInfo :: String -> String -> BuildTime -> [BuildStep] -> UserInfo
