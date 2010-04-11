@@ -11,6 +11,7 @@ module Utils (Response,
               getMaybeSizedThing, putMaybeSizedThing,
               readSizedThing, sendSizedThing,
               getSortedNumericDirectoryContents,
+              withCurrentDirectory,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
               onConnectionDropped, onConnectionFailed,
               Instructions(..),
@@ -186,6 +187,11 @@ getNumericDirectoryContents fp = do xs <- getDirectoryContents fp
                            die ("Bad directory entry: " ++ show x)
                        Just n ->
                            liftM (n :) (f xs)
+
+withCurrentDirectory :: FilePath -> IO a -> IO a
+withCurrentDirectory dir io = do curDir <- getCurrentDirectory
+                                 (setCurrentDirectory dir >> io)
+                                     `finally` setCurrentDirectory curDir
 
 ignoreDoesNotExist :: IO () -> IO ()
 ignoreDoesNotExist io = io `catch` \e -> unless (isDoesNotExistError e)

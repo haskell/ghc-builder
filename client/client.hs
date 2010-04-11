@@ -231,7 +231,6 @@ runBuildStep bn (bsn, bs)
  = do liftIO $ putStrLn ("Running " ++ show (bs_name bs))
       baseDir <- getBaseDir
       tempBuildDir <- getTempBuildDir
-      liftIO $ setCurrentDirectory (tempBuildDir </> bs_subdir bs)
       let root   = Client baseDir
           name   = bs_name   bs
           subdir = bs_subdir bs
@@ -243,7 +242,8 @@ runBuildStep bn (bsn, bs)
       writeBuildStepSubdir   root bn bsn subdir
       writeBuildStepProg     root bn bsn prog
       writeBuildStepArgs     root bn bsn args
-      ec <- liftIO $ run prog args (buildStepDir </> "output")
+      ec <- liftIO $ withCurrentDirectory (tempBuildDir </> subdir)
+                   $ run prog args (buildStepDir </> "output")
       writeBuildStepExitcode root bn bsn ec
       return ec
 
