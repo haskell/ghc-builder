@@ -6,7 +6,8 @@
 * Some sort of locking so the same client can't connect twice
 * More exception handling
 * "validate this bundle please" feature
-* Add a "start build now" button
+* Add a "start build now" button to the web interface
+* Add a --do-build-now client commandline flag
 * e-mail report collation
 * IRC reporting
 * twitter
