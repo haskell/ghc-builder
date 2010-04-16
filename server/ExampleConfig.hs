@@ -26,7 +26,13 @@ buildSteps = [BuildStep {
                   bs_args = ["argx1", "argx2", "argx3"]
               },
               BuildStep {
-                  bs_name = "Third test build step",
+                  bs_name = "Mem test build step",
+                  bs_subdir = "build",
+                  bs_prog = "/usr/bin/perl",
+                  bs_args = ["-e", "$x = 'a'x102476800"] -- 100M
+              },
+              BuildStep {
+                  bs_name = "Last test build step",
                   bs_subdir = "build",
                   bs_prog = "/bin/pwd",
                   bs_args = []
