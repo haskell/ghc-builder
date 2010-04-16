@@ -23,6 +23,9 @@ import System.Exit
 import System.FilePath
 import System.IO
 import System.IO.Error hiding (catch)
+#ifdef HAVE_SYSTEM_POSIX_RESOURCE
+import System.Posix.Resource
+#endif
 
 baseSubDir :: FilePath
 baseSubDir = "builder"
@@ -38,6 +41,19 @@ getBuildResultFile bn = do dir <- getBaseDir
 main :: IO ()
 main = do hSetBuffering stdout LineBuffering
           hSetBuffering stderr LineBuffering
+#ifdef HAVE_SYSTEM_POSIX_RESOURCE
+          -- We should really have different limits for different
+          -- clients, but for now we just use the same value everywhere
+          let memLimit = 500000000 -- 500M
+          rls <- getResourceLimit ResourceTotalMemory
+          case softLimit rls of
+              ResourceLimit l
+               | l <= memLimit ->
+                  return ()
+              _ ->
+                  setResourceLimit ResourceTotalMemory
+                                   (rls {softLimit = ResourceLimit memLimit})
+#endif
           unless rtsSupportsBoundThreads $ die "Not linked with -threaded"
           args <- getArgs
           case args of
