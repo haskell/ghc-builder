@@ -44,7 +44,7 @@ main = do hSetBuffering stdout LineBuffering
 #ifdef HAVE_SYSTEM_POSIX_RESOURCE
           -- We should really have different limits for different
           -- clients, but for now we just use the same value everywhere
-          let memLimit = 500000000 -- 500M
+          let memLimit = 1000000000 -- 1G
           rls <- getResourceLimit ResourceTotalMemory
           case softLimit rls of
               ResourceLimit l
