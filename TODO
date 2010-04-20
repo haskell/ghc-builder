@@ -1,6 +1,4 @@
 
-* The timestamps for the server -v output are currently in a random
-  timezone. We need to reset the TZ before printing them.
 * Add a way for "results" (e.g. bindists) to be uploaded
 * Add SSL instructions to docs
 * Work out if SSL is actually being used correctly

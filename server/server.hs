@@ -17,6 +17,7 @@ import Control.Monad.Trans
 import Data.Char
 import Data.List
 import Data.Maybe
+import Data.Time.Format
 import Data.Time.LocalTime
 import Network.Socket
 import OpenSSL
@@ -30,7 +31,6 @@ import System.FilePath
 import System.IO
 import System.Locale
 import System.Posix.Env
-import System.Time
 
 main :: IO ()
 main = do hSetBuffering stdout LineBuffering
@@ -189,10 +189,9 @@ verbose str = do v <- getVerbosity
 verbose' :: Verbosity -> Who -> String -> IO ()
 verbose' v w str
  = when (v >= Verbose) $
-       do clockTime <- getClockTime
-          calendarTime <- toCalendarTime clockTime
+       do tod <- getTODinTZ "UTC"
           let fmt = "[%Y-%m-%d %H:%M:%S]"
-              t = formatCalendarTime defaultTimeLocale fmt calendarTime
+              t = formatTime defaultTimeLocale fmt tod
           putStrLn (unwords [t, pprWho w, str])
 
 data Who = User User | Unauthed | Notifier
