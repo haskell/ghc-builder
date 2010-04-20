@@ -1,4 +1,5 @@
 
+* Add a deafening client verbosity which also prints command output
 * Add a way for "results" (e.g. bindists) to be uploaded
 * Add SSL instructions to docs
 * Work out if SSL is actually being used correctly
