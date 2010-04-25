@@ -1,4 +1,6 @@
 
+* Handle SIGHUP
+* Add log-to-file capability
 * Add build "flunk"ing. Use for testsuite.
 * Get the testsuite summary into the e-mails somehow.
 * Add a deafening client verbosity which also prints command output
