@@ -95,8 +95,12 @@ runClient v = do curDir <- getCurrentDirectory
                              threadDelay (secs * 1000000)
                              conn host ((secs * 2) `min` 600)
 
-          c host = do addrinfos <- getAddrInfo Nothing (Just host)
-                                                       (Just (show port))
+          c host = do let hints = defaultHints {
+                                      addrSocketType = Stream
+                                  }
+                      addrinfos <- getAddrInfo (Just hints)
+                                               (Just host)
+                                               (Just (show port))
                       let serveraddr = head addrinfos
                       sock <- socket (addrFamily serveraddr) Stream
                                      defaultProtocol
