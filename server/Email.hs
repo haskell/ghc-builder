@@ -1,13 +1,16 @@
 
 module Email where
 
+import Command
 import Config
 import Files
 import SendMail
 import ServerMonad
 import Utils
 
+import Codec.MIME.String.Headers
 import Control.Monad
+import Data.Maybe
 import System.Exit
 import System.FilePath
 
@@ -19,14 +22,29 @@ sendEmails u bn url
           root = Server (baseDir </> "clients") u
           mkStep bsn = do stepName <- readBuildStepName root bn bsn
                           ec <- readBuildStepExitcode root bn bsn
-                          let res = case ec of
-                                    ExitSuccess -> "Success"
-                                    ExitFailure n -> "Failure: " ++ show n
-                          return [stepName, res]
+                          case ec of
+                              ExitSuccess ->
+                                  return ([stepName, "Success"],
+                                          Nothing)
+                              ExitFailure n ->
+                                  do moutput <- getMaybeBuildStepOutput root bn bsn
+                                     let doLine x = case maybeRead x of
+                                                    Nothing -> x
+                                                    Just (Stdout str) -> str
+                                                    Just (Stderr str) -> str
+                                         lastFew = case moutput of
+                                                   Nothing -> ""
+                                                   Just x ->
+                                                       unlines $ map doLine $ lastN 30 $ lines x
+                                         contentType = ContentType "text" "plain" [Parameter "charset" "ISO-8859-1"]
+                                         attachment = (lastFew, "step." ++ stepName ++ ".txt", Just contentType)
+                                     return ([stepName, "Failure: " ++ show n],
+                                             Just attachment)
       bsns <- getSortedNumericDirectoryContents stepsDir
       steps <- mapM mkStep bsns
       result <- readBuildResult root bn
-      let buildResult = case result of
+      let (stepDescrs, maybeAttachments) = unzip steps
+          buildResult = case result of
                         Success -> "Build succeeded"
                         Failure -> "Build failed"
                         Incomplete -> "Build incomplete"
@@ -38,7 +56,7 @@ sendEmails u bn url
                        link,
                        ""]
                    ++ showTable [rPad, noPad]
-                                steps
+                                stepDescrs
                    ++ ["",
                        buildResult,
                        link,
@@ -46,5 +64,7 @@ sendEmails u bn url
           subject = description ++ ", " ++ show result
           body = unlines bodyLines
       unless (null emailAddresses) $
-          sendMail fromAddress emailAddresses subject body Nothing []
+          sendMail fromAddress emailAddresses subject
+                   body Nothing
+                   (catMaybes maybeAttachments)
 

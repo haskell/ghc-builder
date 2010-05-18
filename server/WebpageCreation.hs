@@ -30,8 +30,6 @@ createWebPage u bn
 mkStepPage :: User -> BuildNum -> BuildStepNum -> IO ()
 mkStepPage u bn bsn
  = do let root = Server (baseDir </> "clients") u
-          buildDir = baseDir </> "clients" </> u </> "builds" </> show bn
-          stepDir = buildDir </> "steps" </> show bsn
           page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
           maybeToHtml Nothing    = (thespan ! [theclass "missing"])
                                        (stringToHtml "Missing")
@@ -44,7 +42,7 @@ mkStepPage u bn bsn
       mprog     <- readMaybeBuildStepProg     root bn bsn
       margs     <- readMaybeBuildStepArgs     root bn bsn
       mec       <- readMaybeBuildStepExitcode root bn bsn
-      moutput   <- maybeReadBinaryFile (stepDir </> "output")
+      moutput   <- getMaybeBuildStepOutput    root bn bsn
       let output = case moutput of
                    Just x -> lines x
                    Nothing -> []

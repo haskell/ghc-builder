@@ -3,7 +3,7 @@ module Utils (Response,
               respOK, respSizedThingFollows, respSendSizedThing,
               respHuh, respAuthFailed,
               User, Pass, port, Verbosity (..), Result(..),
-              die, maybeRead, maybeReadSpace,
+              die, lastN, maybeRead, maybeReadSpace,
               readBinaryFile, maybeReadBinaryFile,
               writeBinaryFile, maybeWriteBinaryFile,
               readFromFile, maybeReadFromFile,
@@ -66,6 +66,12 @@ data Result = Success | Failure | Incomplete
 die :: MonadIO m => String -> m a
 die msg = liftIO $ do hPutStrLn stderr msg
                       exitWith (ExitFailure 1)
+
+lastN :: Int -> [a] -> [a]
+lastN n xs = case splitAt n xs of
+             (ys, zs) -> f ys zs
+    where f acc []            = acc
+          f acc (next : rest) = f (tail acc ++ [next]) rest
 
 maybeRead :: Read a => String -> Maybe a
 maybeRead str = case reads str of
