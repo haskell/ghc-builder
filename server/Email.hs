@@ -28,7 +28,7 @@ sendEmails u bn url
                                           Nothing)
                               ExitFailure n ->
                                   do moutput <- getMaybeBuildStepOutput root bn bsn
-                                     let doLine x = case maybeRead x of
+                                     let doLine x = case maybeReadSpace x of
                                                     Nothing -> x
                                                     Just (Stdout str) -> str
                                                     Just (Stderr str) -> str
