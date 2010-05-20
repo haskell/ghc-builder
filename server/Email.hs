@@ -41,6 +41,8 @@ sendEmails u bn url
                                      return ([stepName, "Failure: " ++ show n],
                                              Just attachment)
       bsns <- getSortedNumericDirectoryContents stepsDir
+              `onDoesNotExist`
+              return []
       steps <- mapM mkStep bsns
       result <- readBuildResult root bn
       let (stepDescrs, maybeAttachments) = unzip steps
