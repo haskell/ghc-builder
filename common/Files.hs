@@ -17,6 +17,7 @@ module Files (
  getMaybeBuildStepExitcode, putMaybeBuildStepExitcode,
  readBuildStepExitcode,     readMaybeBuildStepExitcode, writeBuildStepExitcode,
  removeBuildStepOutput,
+ getMaybeSizedBuildStepOutput,
  getMaybeBuildStepOutput,   putMaybeBuildStepOutput,
  removeBuildResult,
  getMaybeBuildResult,       putMaybeBuildResult,
@@ -237,6 +238,12 @@ getMaybeBuildStepOutput :: MonadIO m
                         -> m (Maybe String)
 getMaybeBuildStepOutput root bn bsn
  = maybeReadBinaryFile (fpBuildStepOutput root bn bsn)
+
+getMaybeSizedBuildStepOutput :: MonadIO m
+                             => Root -> BuildNum -> BuildStepNum
+                             -> m (Maybe (Integer, String))
+getMaybeSizedBuildStepOutput root bn bsn
+ = maybeReadSizedBinaryFile (fpBuildStepOutput root bn bsn)
 
 putMaybeBuildStepOutput :: MonadIO m
                         => Root -> BuildNum -> BuildStepNum -> Maybe String

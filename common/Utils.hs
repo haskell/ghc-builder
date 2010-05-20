@@ -4,11 +4,11 @@ module Utils (Response,
               respHuh, respAuthFailed,
               User, Pass, port, Verbosity (..), Result(..),
               die, lastN, maybeRead, maybeReadSpace,
-              readBinaryFile, maybeReadBinaryFile,
+              readBinaryFile, maybeReadBinaryFile, maybeReadSizedBinaryFile,
               writeBinaryFile, maybeWriteBinaryFile,
               readFromFile, maybeReadFromFile,
               writeToFile,
-              getMaybeSizedThing, putMaybeSizedThing,
+              getMaybeSizedThing, putMaybeSizedThing, putMaybeGivenSizedThing,
               readSizedThing, sendSizedThing,
               getSortedNumericDirectoryContents,
               withCurrentDirectory,
@@ -95,6 +95,17 @@ maybeReadBinaryFile fp
           Just h -> liftIO $ liftM Just $ hGetContents h
           Nothing -> return Nothing
 
+maybeReadSizedBinaryFile :: MonadIO m
+                         => FilePath -> m (Maybe (Integer, String))
+maybeReadSizedBinaryFile fp
+ = do mh <- liftIO (liftM Just (openBinaryFile fp ReadMode)
+                    `onDoesNotExist` return Nothing)
+      case mh of
+          Just h -> liftIO $ liftM Just $ do size <- hFileSize h
+                                             xs <- hGetContents h
+                                             return (size, xs)
+          Nothing -> return Nothing
+
 writeBinaryFile :: MonadIO m => FilePath -> String -> m ()
 writeBinaryFile fp str
     = liftIO $ withBinaryFile fp WriteMode (\h -> hPutStr h str)
@@ -144,8 +155,11 @@ getMaybeSizedThing
                           else die ("Stuff after data: " ++ show line)
 
 putSizedThing :: HandlelikeM m => String -> m ()
-putSizedThing str = do hlPutStrLn $ show $ length str
-                       hlPutStrLn str
+putSizedThing str = putGivenSizedThing (genericLength str) str
+
+putGivenSizedThing :: HandlelikeM m => Integer -> String -> m ()
+putGivenSizedThing size str = do hlPutStrLn $ show size
+                                 hlPutStrLn str
 
 putNoSizedThing :: HandlelikeM m => m ()
 putNoSizedThing = hlPutStrLn "NONE"
@@ -153,6 +167,10 @@ putNoSizedThing = hlPutStrLn "NONE"
 putMaybeSizedThing :: HandlelikeM m => Maybe String -> m ()
 putMaybeSizedThing Nothing = putNoSizedThing
 putMaybeSizedThing (Just str) = putSizedThing str
+
+putMaybeGivenSizedThing :: HandlelikeM m => Maybe (Integer, String) -> m ()
+putMaybeGivenSizedThing Nothing = putNoSizedThing
+putMaybeGivenSizedThing (Just (size, str)) = putGivenSizedThing size str
 
 readFromFile :: (MonadIO m, Read a) => FilePath -> m a
 readFromFile fp = do xs <- readBinaryFile fp

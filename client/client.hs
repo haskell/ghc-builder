@@ -297,16 +297,19 @@ uploadBuildResults bn
           sendString f = do getTheResponseCode respSendSizedThing
                             m <- f
                             putMaybeSizedThing m
+          sendSizedString f = do getTheResponseCode respSendSizedThing
+                                 m <- f
+                                 putMaybeGivenSizedThing m
           sendStep bsn
               = do let stepDir = stepsDir </> show bsn
-                       strings = [getMaybeBuildStepName     root bn bsn,
-                                  getMaybeBuildStepSubdir   root bn bsn,
-                                  getMaybeBuildStepProg     root bn bsn,
-                                  getMaybeBuildStepArgs     root bn bsn,
-                                  getMaybeBuildStepExitcode root bn bsn,
-                                  getMaybeBuildStepOutput   root bn bsn]
+                       strings = [getMaybeBuildStepName        root bn bsn,
+                                  getMaybeBuildStepSubdir      root bn bsn,
+                                  getMaybeBuildStepProg        root bn bsn,
+                                  getMaybeBuildStepArgs        root bn bsn,
+                                  getMaybeBuildStepExitcode    root bn bsn]
                    sendServer ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendString strings
+                   sendSizedString (getMaybeSizedBuildStepOutput root bn bsn)
                    getTheResponseCode respOK
                    removeBuildStepName     root bn bsn
                    removeBuildStepSubdir   root bn bsn
