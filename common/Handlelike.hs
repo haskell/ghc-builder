@@ -24,7 +24,12 @@ instance Handlelike Handle where
                  in hlGetLoop f n
 
 instance Handlelike SSL where
-    hlPutStrLn' s str = write s (BS.pack (str ++ "\n"))
+    hlPutStrLn' s str = mapM_ doChunk $ chunk (str ++ "\n")
+        where chunk "" = []
+              chunk xs = case splitAt 1024 xs of
+                         (ys, zs) ->
+                             ys : chunk zs
+              doChunk xs = write s (BS.pack xs)
     hlGetLine' s = do let f acc = do str <- OpenSSL.Session.read s 1
                                      case BS.unpack str of
                                          "\n" -> return (reverse acc)
