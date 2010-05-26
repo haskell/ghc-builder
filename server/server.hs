@@ -112,7 +112,7 @@ listenForClients v directory serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let mainLoop = do (conn, _) <- Network.Socket.accept sock
-                        _ <- forkIO $ startSsl v conn directory
+                        _ <- forkIO $ startSsl v directory conn
                         mainLoop
       mainLoop
 
@@ -122,8 +122,8 @@ fpServerPem = "certs/server.pem"
 fpRootPem :: FilePath
 fpRootPem = "certs/root.pem"
 
-startSsl :: Verbosity -> Socket -> Directory -> IO ()
-startSsl v s directory
+startSsl :: Verbosity -> Directory -> Socket -> IO ()
+startSsl v directory s
  = do msg <- hlGetLine' s
       verbose' v directory Unauthed ("Received: " ++ show msg)
       case msg of
@@ -139,12 +139,12 @@ startSsl v s directory
                  OpenSSL.Session.accept ssl
                  mUser <- verifySsl ssl
                  sendHandle v directory ssl respOK "Welcome to SSL"
-                 authClient v (Ssl ssl) directory mUser
+                 authClient v directory (Ssl ssl) mUser
           "NO SSL" ->
               do sendHandle v directory s respOK "OK, no SSL"
-                 authClient v (Socket s) directory Nothing
+                 authClient v directory (Socket s) Nothing
           _ -> do sendHandle v directory s respHuh "Expected SSL instructions"
-                  startSsl v s directory
+                  startSsl v directory s
 
 verifySsl :: SSL -> IO (Maybe User)
 verifySsl ssl
@@ -164,8 +164,8 @@ verifySsl ssl
                      Nothing ->
                          die "Certificate has no CN"
 
-authClient :: Verbosity -> HandleOrSsl -> Directory -> Maybe User -> IO ()
-authClient v h directory mu
+authClient :: Verbosity -> Directory -> HandleOrSsl -> Maybe User -> IO ()
+authClient v directory h mu
  = do msg <- hlGetLine' h
       verbose' v directory Unauthed ("Received: " ++ show msg)
       config <- getConfig directory
@@ -191,19 +191,19 @@ authClient v h directory mu
                                  verbose' v directory (User user) "Disconnected"
                   _ ->
                       do sendHandle v directory h respHuh "I don't understand"
-                         authClient v h directory mu
+                         authClient v directory h mu
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
                       do sendHandle v directory h respHuh "I don't understand"
-                         authClient v h directory mu
+                         authClient v directory h mu
                   _ ->
                       do sendHandle v directory h respHuh "I don't understand"
-                         authClient v h directory mu
+                         authClient v directory h mu
     where authFailed reason = do verbose' v directory Unauthed ("Auth failed: " ++ reason)
                                  sendHandle v directory h respAuthFailed "auth failed"
-                                 authClient v h directory mu
+                                 authClient v directory h mu
 
 verbose :: String -> ServerMonad ()
 verbose str = do v <- getVerbosity
