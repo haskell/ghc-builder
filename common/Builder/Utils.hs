@@ -17,7 +17,8 @@ module Builder.Utils (Response,
               Instructions(..),
               mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
               BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
-              showTable, noPad, lPad, rPad
+              showTable, noPad, lPad, rPad,
+              Config(..)
              ) where
 
 import Builder.Handlelike
@@ -323,4 +324,12 @@ lPad n s = replicate (n - length s) ' ' ++ s
 
 rPad :: Int -> String -> String
 rPad n s = s ++ replicate (n - length s) ' '
+
+data Config = Config {
+                  config_fromAddress :: String,
+                  config_emailAddresses :: [String],
+                  config_urlRoot :: String,
+                  config_clients :: [(String, UserInfo)]
+              }
+    deriving Typeable
 

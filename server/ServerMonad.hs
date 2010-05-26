@@ -8,7 +8,6 @@ module ServerMonad (
                     getUserInfo,
                     getNotifierVar,
                     -- XXX Don't really belong here:
-                    Config(..),
                     Directory(..),
                     getConfig,
                     NVar,
@@ -22,7 +21,6 @@ import Builder.Utils
 import Control.Concurrent.MVar
 import Control.Monad.State
 import Data.Time.LocalTime
-import Data.Typeable
 
 type NVar = MVar (User, BuildNum)
 
@@ -95,14 +93,6 @@ instance HandlelikeM ServerMonad where
                    liftIO $ hlGetLine' h
     hlGet n = do h <- getHandleOrSsl
                  liftIO $ hlGet' h n
-
-data Config = Config {
-                  config_fromAddress :: String,
-                  config_emailAddresses :: [String],
-                  config_urlRoot :: String,
-                  config_clients :: [(String, UserInfo)]
-              }
-    deriving Typeable
 
 data Directory = Directory {
                      dir_notifierVar :: NVar,
