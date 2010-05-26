@@ -11,6 +11,7 @@ import Linker
 import MonadUtils
 import Packages
 
+import Control.Concurrent
 import Control.Concurrent.MVar
 import Control.Monad
 import Data.Dynamic
@@ -20,7 +21,11 @@ configHandler :: CHVar -> IO ()
 configHandler chv = do m <- loadConfig
                        case m of
                            Just config -> worker chv config
-                           Nothing -> die "Can't load config"
+                           Nothing ->
+                               do warn "Can't load config..."
+                                  threadDelay 1000000
+                                  warn "...retrying"
+                                  configHandler chv
 
 worker :: CHVar -> Config -> IO ()
 worker chv config
