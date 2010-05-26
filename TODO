@@ -1,5 +1,4 @@
 
-* Handle SIGHUP
 * Have one thread do all time queries, or look at using
   timezone-series or timezone-olson to better handle timezones
 * Add log-to-file capability
