@@ -8,6 +8,7 @@ module ServerMonad (
                     getUserInfo,
                     getNotifierVar,
                     -- XXX Don't really belong here:
+                    Directory(..),
                     NVar,
                     CHVar, ConfigHandlerRequest(..),
                     baseDir,
@@ -37,21 +38,18 @@ data ServerState = ServerState {
                        ss_handleOrSsl :: HandleOrSsl,
                        ss_user :: String,
                        ss_verbosity :: Verbosity,
-                       ss_webpage_creation_var :: NVar,
-                       ss_configHandler_var :: CHVar,
+                       ss_directory :: Directory,
                        ss_last_ready_time :: TimeOfDay
                    }
 
-mkServerState :: HandleOrSsl -> User -> Verbosity -> NVar -> CHVar
-              -> TimeOfDay
+mkServerState :: HandleOrSsl -> User -> Verbosity -> Directory -> TimeOfDay
               -> ServerState
-mkServerState h u v wcvar chv lrt
+mkServerState h u v directory lrt
     = ServerState {
           ss_handleOrSsl = h,
           ss_user = u,
           ss_verbosity = v,
-          ss_webpage_creation_var = wcvar,
-          ss_configHandler_var = chv,
+          ss_directory = directory,
           ss_last_ready_time = lrt
       }
 
@@ -81,13 +79,14 @@ setLastReadyTime tod = do st <- ServerMonad get
 getUserInfo :: ServerMonad (Maybe UserInfo)
 getUserInfo = do st <- ServerMonad get
                  mv <- liftIO $ newEmptyMVar
-                 liftIO $ putMVar (ss_configHandler_var st) (GiveMeConfig mv)
+                 let chv = dir_configHandlerVar $ ss_directory st
+                 liftIO $ putMVar chv (GiveMeConfig mv)
                  config <- liftIO $ takeMVar mv
                  return $ lookup (ss_user st) config
 
 getNotifierVar :: ServerMonad NVar
 getNotifierVar = do st <- ServerMonad get
-                    return $ ss_webpage_creation_var st
+                    return $ dir_notifierVar $ ss_directory st
 
 instance HandlelikeM ServerMonad where
     hlPutStrLn str = do h <- getHandleOrSsl
@@ -96,4 +95,9 @@ instance HandlelikeM ServerMonad where
                    liftIO $ hlGetLine' h
     hlGet n = do h <- getHandleOrSsl
                  liftIO $ hlGet' h n
+
+data Directory = Directory {
+                     dir_notifierVar :: NVar,
+                     dir_configHandlerVar :: CHVar
+                 }
 
