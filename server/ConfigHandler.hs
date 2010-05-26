@@ -11,7 +11,6 @@ import MonadUtils
 import Packages
 
 import Control.Concurrent
-import Control.Concurrent.MVar
 import Control.Exception
 import Control.Monad
 import Data.Dynamic
@@ -54,7 +53,7 @@ loadConfig = do
         let dflags1 = dflags0 {
                           hscTarget = HscInterpreted
                       }
-        setSessionDynFlags dflags1
+        _ <- setSessionDynFlags dflags1
 
         -- Due to the global nature of the linker, if we don't unload
         -- everything then the second time we call loadConfig we get
