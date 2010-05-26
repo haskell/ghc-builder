@@ -8,7 +8,9 @@ module ServerMonad (
                     getUserInfo,
                     getNotifierVar,
                     -- XXX Don't really belong here:
+                    Config(..),
                     Directory(..),
+                    getConfig,
                     NVar,
                     CHVar, ConfigHandlerRequest(..),
                     baseDir,
@@ -20,6 +22,7 @@ import Builder.Utils
 import Control.Concurrent.MVar
 import Control.Monad.State
 import Data.Time.LocalTime
+import Data.Typeable
 
 type NVar = MVar (User, BuildNum)
 
@@ -78,11 +81,8 @@ setLastReadyTime tod = do st <- ServerMonad get
 
 getUserInfo :: ServerMonad (Maybe UserInfo)
 getUserInfo = do st <- ServerMonad get
-                 mv <- liftIO $ newEmptyMVar
-                 let chv = dir_configHandlerVar $ ss_directory st
-                 liftIO $ putMVar chv (GiveMeConfig mv)
-                 config <- liftIO $ takeMVar mv
-                 return $ lookup (ss_user st) config
+                 config <- liftIO $ getConfig (ss_directory st)
+                 return $ lookup (ss_user st) $ config_clients config
 
 getNotifierVar :: ServerMonad NVar
 getNotifierVar = do st <- ServerMonad get
@@ -96,8 +96,22 @@ instance HandlelikeM ServerMonad where
     hlGet n = do h <- getHandleOrSsl
                  liftIO $ hlGet' h n
 
+data Config = Config {
+                  config_fromAddress :: String,
+                  config_emailAddresses :: [String],
+                  config_urlRoot :: String,
+                  config_clients :: [(String, UserInfo)]
+              }
+    deriving Typeable
+
 data Directory = Directory {
                      dir_notifierVar :: NVar,
                      dir_configHandlerVar :: CHVar
                  }
+
+getConfig :: Directory -> IO Config
+getConfig directory
+ = do mv <- newEmptyMVar
+      putMVar (dir_configHandlerVar directory) (GiveMeConfig mv)
+      takeMVar mv
 

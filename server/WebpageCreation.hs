@@ -1,7 +1,6 @@
 
 module WebpageCreation where
 
-import Config
 import ServerMonad
 
 import Builder.Command
@@ -13,9 +12,10 @@ import System.Exit
 import System.FilePath
 import Text.XHtml.Strict
 
-createWebPage :: User -> BuildNum -> IO String
-createWebPage u bn
- = do let buildsDir = baseDir </> "clients" </> u </> "builds"
+createWebPage :: Config -> User -> BuildNum -> IO String
+createWebPage config u bn
+ = do let urlRoot = config_urlRoot config
+          buildsDir = baseDir </> "clients" </> u </> "builds"
           buildDir = buildsDir </> show bn
           stepsDir = buildDir </> "steps"
           webBuildDir = baseDir </> "web/builders" </> u </> show bn

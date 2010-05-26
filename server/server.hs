@@ -3,7 +3,6 @@
 
 module Main where
 
-import Config
 import ConfigHandler
 import Notification
 import ServerMonad
@@ -76,15 +75,15 @@ runServer :: Verbosity -> IO ()
 runServer v =
     do notifierVar <- newEmptyMVar
        configHandlerVar <- newEmptyMVar
-       persistentThread v "Notification" (notifier notifierVar)
+       let directory = Directory {
+                           dir_notifierVar = notifierVar,
+                           dir_configHandlerVar = configHandlerVar
+                       }
+       persistentThread v "Notification" (notifier directory)
        persistentThread v "Config handler" (configHandler configHandlerVar)
        installHandler sigHUP (Catch (gotSigHUP v configHandlerVar)) Nothing
        addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
        let serveraddr = head addrinfos
-           directory = Directory {
-                           dir_notifierVar = notifierVar,
-                           dir_configHandlerVar = configHandlerVar
-                       }
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
                (listenForClients v directory serveraddr)
@@ -164,11 +163,12 @@ authClient :: Verbosity -> HandleOrSsl -> Directory -> Maybe User -> IO ()
 authClient v h directory mu
  = do msg <- hlGetLine' h
       verbose' v Unauthed ("Received: " ++ show msg)
+      config <- getConfig directory
       case stripPrefix "AUTH " msg of
           Just xs ->
               case break (' ' ==) xs of
                   (user, ' ' : pass) ->
-                      case lookup user clients of
+                      case lookup user (config_clients config) of
                       Nothing ->
                           authFailed ("User " ++ show user ++ " unknown")
                       Just ui

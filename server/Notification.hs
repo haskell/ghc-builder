@@ -7,10 +7,11 @@ import WebpageCreation
 
 import Control.Concurrent.MVar
 
-notifier :: NVar -> IO ()
-notifier nv
- = do (user, bn) <- takeMVar nv
-      webpage <- createWebPage user bn
-      sendEmails user bn webpage
-      notifier nv
+notifier :: Directory -> IO ()
+notifier directory
+ = do (user, bn) <- takeMVar (dir_notifierVar directory)
+      config <- getConfig directory
+      webpage <- createWebPage config user bn
+      sendEmails config user bn webpage
+      notifier directory
 

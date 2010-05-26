@@ -1,7 +1,6 @@
 
 module Email where
 
-import Config
 import SendMail
 import ServerMonad
 
@@ -15,9 +14,11 @@ import Data.Maybe
 import System.Exit
 import System.FilePath
 
-sendEmails :: User -> BuildNum -> String -> IO ()
-sendEmails u bn url
- = do let buildsDir = baseDir </> "clients" </> u </> "builds"
+sendEmails :: Config -> User -> BuildNum -> String -> IO ()
+sendEmails config u bn url
+ = do let fromAddress = config_fromAddress config
+          emailAddresses = config_emailAddresses config
+          buildsDir = baseDir </> "clients" </> u </> "builds"
           buildDir = buildsDir </> show bn
           stepsDir = buildDir </> "steps"
           root = Server (baseDir </> "clients") u

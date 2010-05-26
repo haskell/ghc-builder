@@ -17,8 +17,7 @@ module Builder.Utils (Response,
               Instructions(..),
               mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
               BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
-              showTable, noPad, lPad, rPad,
-              Config
+              showTable, noPad, lPad, rPad
              ) where
 
 import Builder.Handlelike
@@ -35,8 +34,6 @@ import System.Directory
 import System.Exit
 import System.IO
 import System.IO.Error hiding (catch)
-
-type Config = [(String, UserInfo)]
 
 type Response = Int
 
