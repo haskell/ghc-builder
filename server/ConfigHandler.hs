@@ -5,7 +5,6 @@ import ServerMonad
 
 import Builder.Utils
 
-import DynFlags
 import GHC
 import Linker
 import MonadUtils
@@ -13,17 +12,20 @@ import Packages
 
 import Control.Concurrent
 import Control.Concurrent.MVar
+import Control.Exception
 import Control.Monad
 import Data.Dynamic
 import GHC.Paths
+import Prelude hiding (catch)
 
 configHandler :: CHVar -> IO ()
 configHandler chv = do m <- loadConfig
                        case m of
-                           Just config -> worker chv config
-                           Nothing ->
-                               do warn "Can't load config..."
-                                  threadDelay 1000000
+                           Right config -> worker chv config
+                           Left err ->
+                               do warn ("Can't load config:\n" ++ err)
+                                  warn "Sleeping 5 seconds..."
+                                  threadDelay 5000000
                                   warn "...retrying"
                                   configHandler chv
 
@@ -32,22 +34,21 @@ worker chv config
  = do req <- takeMVar chv
       case req of
           ReloadConfig ->
-              do m <- loadConfig
-                 case m of
-                     Just config' ->
-                         worker chv config'
-                     Nothing ->
-                         do warn "Reloading config failed"
+              do e <- loadConfig
+                 case e of
+                     Left err ->
+                         do warn ("Reloading config failed:\n" ++ err)
                             worker chv config
+                     Right config' ->
+                         worker chv config'
           GiveMeConfig mv ->
               do putMVar mv config
                  worker chv config
 
 -- XXX Ought to catch exceptions, and return something more informative
 -- than a Maybe type
-loadConfig :: IO (Maybe Config)
+loadConfig :: IO (Either String Config)
 loadConfig = do
-    defaultErrorHandler defaultDynFlags $ do
       runGhc (Just libdir) $ do
         dflags0 <- getSessionDynFlags
         let dflags1 = dflags0 {
@@ -74,6 +75,8 @@ loadConfig = do
                 error "XXX"
         d <- dynCompileExpr "config"
         case fromDynamic d of
-            Just clients -> return (Just clients)
-            Nothing -> return Nothing
+            Just clients -> return (Right clients)
+            Nothing -> return (Left "config has wrong type")
+    `catch` \e ->
+        return (Left (show (e :: SomeException)))
 
