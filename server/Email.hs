@@ -1,12 +1,13 @@
 
 module Email where
 
-import Command
 import Config
-import Files
 import SendMail
 import ServerMonad
-import Utils
+
+import Builder.Command
+import Builder.Files
+import Builder.Utils
 
 import Codec.MIME.String.Headers
 import Control.Monad

@@ -1,11 +1,12 @@
 
 module WebpageCreation where
 
-import Command
 import Config
-import Files
 import ServerMonad
-import Utils
+
+import Builder.Command
+import Builder.Files
+import Builder.Utils
 
 import System.Directory
 import System.Exit

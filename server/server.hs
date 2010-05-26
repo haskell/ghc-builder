@@ -5,11 +5,12 @@ module Main where
 
 import Config
 import ConfigHandler
-import Files
-import Handlelike
 import Notification
 import ServerMonad
-import Utils
+
+import Builder.Files
+import Builder.Handlelike
+import Builder.Utils
 
 import Control.Concurrent
 import Control.Exception

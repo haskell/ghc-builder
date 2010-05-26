@@ -1,5 +1,5 @@
 
-module Files (
+module Builder.Files (
  Root(..),
  removeBuildStepName,
  getMaybeBuildStepName,     putMaybeBuildStepName,
@@ -27,7 +27,7 @@ module Files (
  readBuildInstructions,                                 writeBuildInstructions,
              ) where
 
-import Utils
+import Builder.Utils
 
 import Control.Monad.Trans
 import System.Directory

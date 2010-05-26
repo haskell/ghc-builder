@@ -2,7 +2,8 @@
 module ConfigHandler (configHandler) where
 
 import ServerMonad
-import Utils
+
+import Builder.Utils
 
 import DynFlags
 import GHC

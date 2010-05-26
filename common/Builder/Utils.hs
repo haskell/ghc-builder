@@ -1,5 +1,5 @@
 
-module Utils (Response,
+module Builder.Utils (Response,
               respOK, respSizedThingFollows, respSendSizedThing,
               respHuh, respAuthFailed, respIForgotYou,
               User, Pass, port, Verbosity (..), Result(..),
@@ -21,7 +21,7 @@ module Utils (Response,
               Config
              ) where
 
-import Handlelike
+import Builder.Handlelike
 
 import Control.Exception
 import Control.Monad

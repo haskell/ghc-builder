@@ -14,8 +14,8 @@ module ServerMonad (
                     baseDir,
                    ) where
 
-import Handlelike
-import Utils
+import Builder.Handlelike
+import Builder.Utils
 
 import Control.Concurrent.MVar
 import Control.Monad.State

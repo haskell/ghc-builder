@@ -4,10 +4,11 @@
 module Main (main) where
 
 import ClientMonad
-import Command
-import Files
-import Handlelike
-import Utils
+
+import Builder.Command
+import Builder.Files
+import Builder.Handlelike
+import Builder.Utils
 
 import Control.Concurrent
 import Control.Exception

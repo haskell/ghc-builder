@@ -1,7 +1,7 @@
 
-module Command where
+module Builder.Command where
 
-import Utils
+import Builder.Utils
 
 import Control.Concurrent
 import Control.Exception

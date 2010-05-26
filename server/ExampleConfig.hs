@@ -1,7 +1,7 @@
 
 module Config (clients, fromAddress, emailAddresses, urlRoot) where
 
-import Utils
+import Builder.Utils
 
 fromAddress :: String
 fromAddress = "cvs-ghc@haskell.org"

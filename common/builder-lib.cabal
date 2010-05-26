@@ -13,7 +13,10 @@ build-type: Simple
 cabal-version: >=1.2
 
 Library
-    Exposed-Modules: Command Files Handlelike Utils
+    Exposed-Modules: Builder.Command
+                     Builder.Files
+                     Builder.Handlelike
+                     Builder.Utils
     Extensions: DeriveDataTypeable
     Ghc-Options: -Wall
     Build-Depends: base        >= 4   && < 5,

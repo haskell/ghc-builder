@@ -5,8 +5,8 @@ module ClientMonad (ClientMonad, evalClientMonad, mkClientState,
                     getVerbosity, getHost, getBaseDir, getHandle, setHandle
                    ) where
 
-import Handlelike
-import Utils
+import Builder.Handlelike
+import Builder.Utils
 
 import Control.Monad.State
 
