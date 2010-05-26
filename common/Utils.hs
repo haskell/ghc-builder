@@ -1,9 +1,9 @@
 
 module Utils (Response,
               respOK, respSizedThingFollows, respSendSizedThing,
-              respHuh, respAuthFailed,
+              respHuh, respAuthFailed, respIForgotYou,
               User, Pass, port, Verbosity (..), Result(..),
-              die, lastN, maybeRead, maybeReadSpace,
+              die, warn, lastN, maybeRead, maybeReadSpace,
               readBinaryFile, maybeReadBinaryFile, maybeReadSizedBinaryFile,
               writeBinaryFile, maybeWriteBinaryFile,
               readFromFile, maybeReadFromFile,
@@ -17,7 +17,8 @@ module Utils (Response,
               Instructions(..),
               mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
               BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
-              showTable, noPad, lPad, rPad
+              showTable, noPad, lPad, rPad,
+              Config
              ) where
 
 import Handlelike
@@ -26,6 +27,7 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
 import Data.Char
+import Data.Typeable
 import Data.List
 import Data.Time.LocalTime
 import Prelude hiding (catch)
@@ -33,6 +35,8 @@ import System.Directory
 import System.Exit
 import System.IO
 import System.IO.Error hiding (catch)
+
+type Config = [(String, UserInfo)]
 
 type Response = Int
 
@@ -51,6 +55,9 @@ respHuh = 500
 respAuthFailed :: Response
 respAuthFailed = 501
 
+respIForgotYou :: Response
+respIForgotYou = 502
+
 type User = String
 type Pass = String
 
@@ -66,6 +73,9 @@ data Result = Success | Failure | Incomplete
 die :: MonadIO m => String -> m a
 die msg = liftIO $ do hPutStrLn stderr msg
                       exitWith (ExitFailure 1)
+
+warn :: MonadIO m => String -> m ()
+warn msg = liftIO $ hPutStrLn stderr msg
 
 lastN :: Int -> [a] -> [a]
 lastN n xs = case splitAt n xs of
@@ -264,6 +274,7 @@ data UserInfo = UserInfo {
                     ui_buildTime :: BuildTime,
                     ui_buildInstructions :: [BuildStep]
                 }
+    deriving Typeable
 
 data Instructions = Idle
                   | StartBuild BuildTime

@@ -4,6 +4,7 @@
 module Main where
 
 import Config
+import ConfigHandler
 import Files
 import Handlelike
 import Notification
@@ -72,24 +73,31 @@ addClient client
 runServer :: Verbosity -> IO ()
 runServer v =
     do notifierVar <- newEmptyMVar
-       let notifierThread
-               = notifier notifierVar
-                 `catch` \e ->
-                     do verbose' v Notifier ("Notification thread got an exception:\n" ++ show (e :: SomeException) ++ "\nRestarting...")
-                        notifierThread
-       _ <- forkIO notifierThread
+       configHandlerVar <- newEmptyMVar
+       persistentThread v "Notification" (notifier notifierVar)
+       persistentThread v "Config handler" (configHandler configHandlerVar)
        addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
-               (listenForClients v notifierVar serveraddr)
+               (listenForClients v notifierVar configHandlerVar serveraddr)
 
-listenForClients :: Verbosity -> NVar -> AddrInfo -> Socket -> IO ()
-listenForClients v nv serveraddr sock
+persistentThread :: Verbosity -> String -> IO () -> IO ()
+persistentThread v title f
+ = do let thread = f `catch` \e -> do verbose' v Notifier (exceptionMsg e)
+                                      thread
+      _ <- forkIO thread
+      return ()
+    where exceptionMsg e = unlines [title ++ " thread got an exception:",
+                                    show (e :: SomeException),
+                                    "Restarting..."]
+
+listenForClients :: Verbosity -> NVar -> CHVar -> AddrInfo -> Socket -> IO ()
+listenForClients v nv chv serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let mainLoop = do (conn, _) <- Network.Socket.accept sock
-                        _ <- forkIO $ startSsl v conn nv
+                        _ <- forkIO $ startSsl v conn nv chv
                         mainLoop
       mainLoop
 
@@ -99,8 +107,8 @@ fpServerPem = "certs/server.pem"
 fpRootPem :: FilePath
 fpRootPem = "certs/root.pem"
 
-startSsl :: Verbosity -> Socket -> NVar -> IO ()
-startSsl v s nv
+startSsl :: Verbosity -> Socket -> NVar -> CHVar -> IO ()
+startSsl v s nv chv
  = do msg <- hlGetLine' s
       verbose' v Unauthed ("Received: " ++ show msg)
       case msg of
@@ -116,12 +124,12 @@ startSsl v s nv
                  OpenSSL.Session.accept ssl
                  mUser <- verifySsl ssl
                  sendHandle v ssl respOK "Welcome to SSL"
-                 authClient v (Ssl ssl) nv mUser
+                 authClient v (Ssl ssl) nv chv mUser
           "NO SSL" ->
               do sendHandle v s respOK "OK, no SSL"
-                 authClient v (Socket s) nv Nothing
+                 authClient v (Socket s) nv chv Nothing
           _ -> do sendHandle v s respHuh "Expected SSL instructions"
-                  startSsl v s nv
+                  startSsl v s nv chv
 
 verifySsl :: SSL -> IO (Maybe User)
 verifySsl ssl
@@ -141,8 +149,8 @@ verifySsl ssl
                      Nothing ->
                          die "Certificate has no CN"
 
-authClient :: Verbosity -> HandleOrSsl -> NVar -> Maybe User -> IO ()
-authClient v h nv mu
+authClient :: Verbosity -> HandleOrSsl -> NVar -> CHVar -> Maybe User -> IO ()
+authClient v h nv chv mu
  = do msg <- hlGetLine' h
       verbose' v Unauthed ("Received: " ++ show msg)
       case stripPrefix "AUTH " msg of
@@ -161,25 +169,25 @@ authClient v h nv mu
                           do tod <- getTODinTZ (ui_timezone ui)
                              sendHandle v h respOK "authenticated"
                              let serverState = mkServerState
-                                                   h user v nv tod ui
+                                                   h user v nv chv tod
                              evalServerMonad handleClient serverState
                                  `finally`
                                  verbose' v (User user) "Disconnected"
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h nv mu
+                         authClient v h nv chv mu
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h nv mu
+                         authClient v h nv chv mu
                   _ ->
                       do sendHandle v h respHuh "I don't understand"
-                         authClient v h nv mu
+                         authClient v h nv chv mu
     where authFailed reason = do verbose' v Unauthed ("Auth failed: " ++ reason)
                                  sendHandle v h respAuthFailed "auth failed"
-                                 authClient v h nv mu
+                                 authClient v h nv chv mu
 
 verbose :: String -> ServerMonad ()
 verbose str = do v <- getVerbosity
@@ -214,74 +222,95 @@ sendClient resp str
       hlPutStrLn respStr
 
 handleClient :: ServerMonad ()
-handleClient = do talk
+handleClient = do msg <- hlGetLine
+                  verbose ("Received: " ++ show msg)
+                  case msg of
+                      -- XXX "HELP"
+                      "BUILD INSTRUCTIONS" ->
+                          withUserInfo answerBuildInstructions
+                      "LAST UPLOADED" ->
+                          answerLastUploaded
+                      "RESET TIME" ->
+                          withUserInfo answerResetTime
+                      "READY" ->
+                          withUserInfo answerReady
+                      _
+                       | Just xs <- stripPrefix "UPLOAD " msg,
+                         (ys, ' ' : zs) <- break (' ' ==) xs,
+                         Just buildNum <- maybeRead ys,
+                         Just buildStepNum <- maybeRead zs ->
+                          receiveBuildStep buildNum buildStepNum
+                       | Just xs <- stripPrefix "RESULT " msg,
+                         Just buildNum <- maybeRead xs ->
+                          receiveBuildResult buildNum
+                       | otherwise ->
+                          sendClient respHuh "I don't understand"
                   handleClient
-    where talk :: ServerMonad ()
-          talk = do msg <- hlGetLine
-                    verbose ("Received: " ++ show msg)
-                    case msg of
-                        -- XXX "HELP"
-                        "BUILD INSTRUCTIONS" ->
-                            do sendClient respSendSizedThing "What sort?"
-                               instructions <- readSizedThing
-                               user <- getUser
-                               let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_allocated"
-                               lastBuildNum <- readFromFile lastBuildNumFile
-                               let thisBuildNum = lastBuildNum + 1
-                               writeToFile lastBuildNumFile thisBuildNum
-                               bss <- case instructions of
-                                      StartBuild _ ->
-                                          getBuildInstructions
-                                      Idle ->
-                                          -- XXX The client did something
-                                          -- odd if we get here
-                                          getBuildInstructions
-                               sendClient respSizedThingFollows "Instructions follow"
-                               sendSizedThing $ mkBuildInstructions instructions thisBuildNum bss
-                               sendClient respOK "That's it"
-                        "LAST UPLOADED" ->
-                            do sendClient respSizedThingFollows "Build number follows"
-                               user <- getUser
-                               let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_uploaded"
-                               lastBuildNum <- readFromFile lastBuildNumFile
-                               sendSizedThing (lastBuildNum :: BuildNum)
-                               sendClient respOK "That's it"
-                        "RESET TIME" ->
-                            do tz <- getTimezone
-                               current <- getTODinTZ tz
-                               setLastReadyTime current
-                               sendClient respOK "Done"
-                        "READY" ->
-                            do scheduled <- getScheduledBuildTime
-                               what <- case scheduled of
-                                       Other why ->
-                                           return (StartBuild (Other why))
-                                       Continuous ->
-                                           return (StartBuild Continuous)
-                                       Timed tod ->
-                                           do prev <- getLastReadyTime
-                                              tz <- getTimezone
-                                              current <- getTODinTZ tz
-                                              setLastReadyTime current
-                                              if scheduledTimePassed prev current tod
-                                                  then return (StartBuild scheduled)
-                                                  else return Idle
-                               sendClient respSizedThingFollows "Your mission, should you choose to accept it, is to:"
-                               sendSizedThing what
-                               verbose ("Sent instructions: " ++ show what)
-                               sendClient respOK "Off you go"
-                        _
-                         | Just xs <- stripPrefix "UPLOAD " msg,
-                           (ys, ' ' : zs) <- break (' ' ==) xs,
-                           Just buildNum <- maybeRead ys,
-                           Just buildStepNum <- maybeRead zs ->
-                            receiveBuildStep buildNum buildStepNum
-                         | Just xs <- stripPrefix "RESULT " msg,
-                           Just buildNum <- maybeRead xs ->
-                            receiveBuildResult buildNum
-                         | otherwise ->
-                            sendClient respHuh "I don't understand"
-                    talk
+
+withUserInfo :: (UserInfo -> ServerMonad ()) -> ServerMonad ()
+withUserInfo f
+ = do mui <- getUserInfo
+      case mui of
+          Nothing ->
+              sendClient respIForgotYou "I forgot you"
+          Just ui ->
+              f ui
+
+answerBuildInstructions :: UserInfo -> ServerMonad ()
+answerBuildInstructions ui
+ = do sendClient respSendSizedThing "What sort?"
+      instructions <- readSizedThing
+      user <- getUser
+      let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_allocated"
+      lastBuildNum <- readFromFile lastBuildNumFile
+      let thisBuildNum = lastBuildNum + 1
+      writeToFile lastBuildNumFile thisBuildNum
+      let bss = case instructions of
+                StartBuild _ ->
+                    ui_buildInstructions ui
+                Idle ->
+                    -- XXX The client did something odd if we get here
+                    ui_buildInstructions ui
+      sendClient respSizedThingFollows "Instructions follow"
+      sendSizedThing $ mkBuildInstructions instructions thisBuildNum bss
+      sendClient respOK "That's it"
+
+answerLastUploaded :: ServerMonad ()
+answerLastUploaded
+ = do sendClient respSizedThingFollows "Build number follows"
+      user <- getUser
+      let lastBuildNumFile = baseDir </> "clients" </> user </> "last_build_num_uploaded"
+      lastBuildNum <- readFromFile lastBuildNumFile
+      sendSizedThing (lastBuildNum :: BuildNum)
+      sendClient respOK "That's it"
+
+answerResetTime :: UserInfo -> ServerMonad ()
+answerResetTime ui = do let tz = ui_timezone ui
+                        current <- getTODinTZ tz
+                        setLastReadyTime current
+                        sendClient respOK "Done"
+
+answerReady :: UserInfo -> ServerMonad ()
+answerReady ui
+ = do let scheduled = ui_buildTime ui
+      what <- case scheduled of
+              Other why ->
+                  return (StartBuild (Other why))
+              Continuous ->
+                  return (StartBuild Continuous)
+              Timed tod ->
+                  do prev <- getLastReadyTime
+                     let tz = ui_timezone ui
+                     current <- getTODinTZ tz
+                     setLastReadyTime current
+                     if scheduledTimePassed prev current tod
+                         then return (StartBuild scheduled)
+                         else return Idle
+      sendClient respSizedThingFollows
+                 "Your mission, should you choose to accept it, is to:"
+      sendSizedThing what
+      verbose ("Sent instructions: " ++ show what)
+      sendClient respOK "Off you go"
 
 receiveBuildStep :: BuildNum -> BuildStepNum -> ServerMonad ()
 receiveBuildStep buildNum buildStepNum

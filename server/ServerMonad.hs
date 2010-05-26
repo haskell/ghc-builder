@@ -5,10 +5,11 @@ module ServerMonad (
                     ServerMonad, evalServerMonad, mkServerState,
                     getVerbosity, getUser,
                     getLastReadyTime, setLastReadyTime,
-                    getTimezone, getScheduledBuildTime, getBuildInstructions,
+                    getUserInfo,
                     getNotifierVar,
                     -- XXX Don't really belong here:
                     NVar,
+                    CHVar, ConfigHandlerRequest(..),
                     baseDir,
                    ) where
 
@@ -21,6 +22,11 @@ import Data.Time.LocalTime
 
 type NVar = MVar (User, BuildNum)
 
+type CHVar = MVar ConfigHandlerRequest
+
+data ConfigHandlerRequest = ReloadConfig
+                          | GiveMeConfig (MVar Config)
+
 baseDir :: FilePath
 baseDir = "data"
 
@@ -32,21 +38,21 @@ data ServerState = ServerState {
                        ss_user :: String,
                        ss_verbosity :: Verbosity,
                        ss_webpage_creation_var :: NVar,
-                       ss_last_ready_time :: TimeOfDay,
-                       ss_user_info :: UserInfo
+                       ss_configHandler_var :: CHVar,
+                       ss_last_ready_time :: TimeOfDay
                    }
 
-mkServerState :: HandleOrSsl -> User -> Verbosity -> NVar
-              -> TimeOfDay -> UserInfo
+mkServerState :: HandleOrSsl -> User -> Verbosity -> NVar -> CHVar
+              -> TimeOfDay
               -> ServerState
-mkServerState h u v wcvar lrt ui
+mkServerState h u v wcvar chv lrt
     = ServerState {
           ss_handleOrSsl = h,
           ss_user = u,
           ss_verbosity = v,
           ss_webpage_creation_var = wcvar,
-          ss_last_ready_time = lrt,
-          ss_user_info = ui
+          ss_configHandler_var = chv,
+          ss_last_ready_time = lrt
       }
 
 evalServerMonad :: ServerMonad a -> ServerState -> IO a
@@ -72,17 +78,12 @@ setLastReadyTime :: TimeOfDay -> ServerMonad ()
 setLastReadyTime tod = do st <- ServerMonad get
                           ServerMonad $ put $ st { ss_last_ready_time = tod }
 
-getTimezone :: ServerMonad String
-getTimezone = do st <- ServerMonad get
-                 return $ ui_timezone $ ss_user_info st
-
-getScheduledBuildTime :: ServerMonad BuildTime
-getScheduledBuildTime = do st <- ServerMonad get
-                           return $ ui_buildTime $ ss_user_info st
-
-getBuildInstructions :: ServerMonad [BuildStep]
-getBuildInstructions = do st <- ServerMonad get
-                          return $ ui_buildInstructions $ ss_user_info st
+getUserInfo :: ServerMonad (Maybe UserInfo)
+getUserInfo = do st <- ServerMonad get
+                 mv <- liftIO $ newEmptyMVar
+                 liftIO $ putMVar (ss_configHandler_var st) (GiveMeConfig mv)
+                 config <- liftIO $ takeMVar mv
+                 return $ lookup (ss_user st) config
 
 getNotifierVar :: ServerMonad NVar
 getNotifierVar = do st <- ServerMonad get

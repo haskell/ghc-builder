@@ -14,12 +14,12 @@ cabal-version: >=1.2
 
 Executable builder-client
     Main-Is: client.hs
-    Hs-Source-Dirs: . ../common/
 
     Ghc-Options: -threaded
     Ghc-Options: -Wall
     Extensions: CPP
     Build-Depends: base       >= 4   && < 5,
+                   builder-lib == 0.1,
                    bytestring >= 0.9 && < 0.10,
                    directory  >= 1.0 && < 1.3,
                    filepath   >= 1.1 && < 1.2,
