@@ -1,11 +1,10 @@
 
-{-# LANGUAGE PatternGuards, ForeignFunctionInterface #-}
-
 module Main where
 
 import ConfigHandler
 import Notification
 import ServerMonad
+import TimeMaster
 
 import Builder.Files
 import Builder.Handlelike
@@ -31,7 +30,6 @@ import System.Environment
 import System.FilePath
 import System.IO
 import System.Locale
-import System.Posix.Env
 import System.Posix.Signals
 
 main :: IO ()
@@ -75,27 +73,34 @@ runServer :: Verbosity -> IO ()
 runServer v =
     do notifierVar <- newEmptyMVar
        configHandlerVar <- newEmptyMVar
+       timeMasterVar <- newEmptyMVar
        let directory = Directory {
                            dir_notifierVar = notifierVar,
-                           dir_configHandlerVar = configHandlerVar
+                           dir_configHandlerVar = configHandlerVar,
+                           dir_timeMasterVar = timeMasterVar
                        }
-       persistentThread v "Notification" (notifier directory)
-       persistentThread v "Config handler" (configHandler configHandlerVar)
-       installHandler sigHUP (Catch (gotSigHUP v configHandlerVar)) Nothing
+       persistentThread v directory "Notification" (notifier directory)
+       persistentThread v directory "Config handler" (configHandler configHandlerVar)
+       persistentThread v directory "Time" (timeMaster timeMasterVar)
+       installHandler sigHUP
+                      (Catch (gotSigHUP v directory))
+                      Nothing
        addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
                (listenForClients v directory serveraddr)
 
-gotSigHUP :: Verbosity -> CHVar -> IO ()
-gotSigHUP v chv = do verbose' v Main "Reloading config"
-                     putMVar chv ReloadConfig
+gotSigHUP :: Verbosity -> Directory -> IO ()
+gotSigHUP v directory
+ = do verbose' v directory Main "Reloading config"
+      putMVar (dir_configHandlerVar directory) ReloadConfig
 
-persistentThread :: Verbosity -> String -> IO () -> IO ()
-persistentThread v title f
- = do let thread = f `catch` \e -> do verbose' v Notifier (exceptionMsg e)
-                                      thread
+persistentThread :: Verbosity -> Directory -> String -> IO () -> IO ()
+persistentThread v directory title f
+ = do let thread = f `catch` \e ->
+                       do verbose' v directory Notifier (exceptionMsg e)
+                          thread
       _ <- forkIO thread
       return ()
     where exceptionMsg e = unlines [title ++ " thread got an exception:",
@@ -120,7 +125,7 @@ fpRootPem = "certs/root.pem"
 startSsl :: Verbosity -> Socket -> Directory -> IO ()
 startSsl v s directory
  = do msg <- hlGetLine' s
-      verbose' v Unauthed ("Received: " ++ show msg)
+      verbose' v directory Unauthed ("Received: " ++ show msg)
       case msg of
           "START SSL" ->
               do serverPem <- readFile fpServerPem
@@ -133,12 +138,12 @@ startSsl v s directory
                  ssl <- OpenSSL.Session.connection sslContext s
                  OpenSSL.Session.accept ssl
                  mUser <- verifySsl ssl
-                 sendHandle v ssl respOK "Welcome to SSL"
+                 sendHandle v directory ssl respOK "Welcome to SSL"
                  authClient v (Ssl ssl) directory mUser
           "NO SSL" ->
-              do sendHandle v s respOK "OK, no SSL"
+              do sendHandle v directory s respOK "OK, no SSL"
                  authClient v (Socket s) directory Nothing
-          _ -> do sendHandle v s respHuh "Expected SSL instructions"
+          _ -> do sendHandle v directory s respHuh "Expected SSL instructions"
                   startSsl v s directory
 
 verifySsl :: SSL -> IO (Maybe User)
@@ -162,7 +167,7 @@ verifySsl ssl
 authClient :: Verbosity -> HandleOrSsl -> Directory -> Maybe User -> IO ()
 authClient v h directory mu
  = do msg <- hlGetLine' h
-      verbose' v Unauthed ("Received: " ++ show msg)
+      verbose' v directory Unauthed ("Received: " ++ show msg)
       config <- getConfig directory
       case stripPrefix "AUTH " msg of
           Just xs ->
@@ -177,38 +182,39 @@ authClient v h directory mu
                        | isJust mu && (Just user /= mu) ->
                           authFailed "User doesn't match SSL certificate CN"
                        | otherwise ->
-                          do tod <- getTODinTZ (ui_timezone ui)
-                             sendHandle v h respOK "authenticated"
+                          do tod <- getTODinTZ directory (ui_timezone ui)
+                             sendHandle v directory h respOK "authenticated"
                              let serverState = mkServerState
                                                    h user v directory tod
                              evalServerMonad handleClient serverState
                                  `finally`
-                                 verbose' v (User user) "Disconnected"
+                                 verbose' v directory (User user) "Disconnected"
                   _ ->
-                      do sendHandle v h respHuh "I don't understand"
+                      do sendHandle v directory h respHuh "I don't understand"
                          authClient v h directory mu
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
-                      do sendHandle v h respHuh "I don't understand"
+                      do sendHandle v directory h respHuh "I don't understand"
                          authClient v h directory mu
                   _ ->
-                      do sendHandle v h respHuh "I don't understand"
+                      do sendHandle v directory h respHuh "I don't understand"
                          authClient v h directory mu
-    where authFailed reason = do verbose' v Unauthed ("Auth failed: " ++ reason)
-                                 sendHandle v h respAuthFailed "auth failed"
+    where authFailed reason = do verbose' v directory Unauthed ("Auth failed: " ++ reason)
+                                 sendHandle v directory h respAuthFailed "auth failed"
                                  authClient v h directory mu
 
 verbose :: String -> ServerMonad ()
 verbose str = do v <- getVerbosity
+                 directory <- getDirectory
                  u <- getUser
-                 liftIO $ verbose' v (User u) str
+                 liftIO $ verbose' v directory (User u) str
 
-verbose' :: Verbosity -> Who -> String -> IO ()
-verbose' v w str
+verbose' :: Verbosity -> Directory -> Who -> String -> IO ()
+verbose' v directory w str
  = when (v >= Verbose) $
-       do tod <- getTODinTZ "UTC"
+       do tod <- getTODinTZ directory "UTC"
           let fmt = "[%Y-%m-%d %H:%M:%S]"
               t = formatTime defaultTimeLocale fmt tod
           putStrLn (unwords [t, pprWho w, str])
@@ -221,10 +227,11 @@ pprWho Unauthed = "[unauthed]"
 pprWho Notifier = "[notifier]"
 pprWho Main     = "[main]"
 
-sendHandle :: Handlelike h => Verbosity -> h -> Response -> String -> IO ()
-sendHandle v h resp str
+sendHandle :: Handlelike h => Verbosity -> Directory -> h -> Response -> String
+           -> IO ()
+sendHandle v directory h resp str
  = do let respStr = show resp ++ " " ++ str
-      verbose' v Unauthed ("Sending: " ++ show respStr)
+      verbose' v directory Unauthed ("Sending: " ++ show respStr)
       hlPutStrLn' h respStr
 
 sendClient :: Response -> String -> ServerMonad ()
@@ -298,7 +305,8 @@ answerLastUploaded
 
 answerResetTime :: UserInfo -> ServerMonad ()
 answerResetTime ui = do let tz = ui_timezone ui
-                        current <- getTODinTZ tz
+                        directory <- getDirectory
+                        current <- liftIO $ getTODinTZ directory tz
                         setLastReadyTime current
                         sendClient respOK "Done"
 
@@ -313,7 +321,8 @@ answerReady ui
               Timed tod ->
                   do prev <- getLastReadyTime
                      let tz = ui_timezone ui
-                     current <- getTODinTZ tz
+                     directory <- getDirectory
+                     current <- liftIO $ getTODinTZ directory tz
                      setLastReadyTime current
                      if scheduledTimePassed prev current tod
                          then return (StartBuild scheduled)
@@ -404,14 +413,9 @@ scheduledTimePassed lastTime curTime scheduledTime
       -- the clock has wrapped, then the time has passed:
    || ((scheduledTime <= curTime) && (curTime < lastTime))
 
--- getTODinTZ ought to be in Utils, but by putting it here we don't have
--- to worry about whether setEnv and tzset exist on the client platforms
-
-getTODinTZ :: MonadIO m => String -> m TimeOfDay
-getTODinTZ tz = do liftIO $ setEnv "TZ" tz True
-                   liftIO tzset
-                   t <- liftIO getZonedTime
-                   return $ localTimeOfDay $ zonedTimeToLocalTime t
-
-foreign import ccall "time.h tzset" tzset :: IO ()
+getTODinTZ :: Directory -> String -> IO TimeOfDay
+getTODinTZ directory tz
+ = do mv <- newEmptyMVar
+      putMVar (dir_timeMasterVar directory) (tz, mv)
+      takeMVar mv
 

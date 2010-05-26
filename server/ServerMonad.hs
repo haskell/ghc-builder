@@ -6,12 +6,13 @@ module ServerMonad (
                     getVerbosity, getUser,
                     getLastReadyTime, setLastReadyTime,
                     getUserInfo,
-                    getNotifierVar,
+                    getDirectory, getNotifierVar,
                     -- XXX Don't really belong here:
                     Directory(..),
                     getConfig,
                     NVar,
                     CHVar, ConfigHandlerRequest(..),
+                    TimeMasterVar,
                     baseDir,
                    ) where
 
@@ -25,6 +26,8 @@ import Data.Time.LocalTime
 type NVar = MVar (User, BuildNum)
 
 type CHVar = MVar ConfigHandlerRequest
+
+type TimeMasterVar = MVar (String, MVar TimeOfDay)
 
 data ConfigHandlerRequest = ReloadConfig
                           | GiveMeConfig (MVar Config)
@@ -82,9 +85,12 @@ getUserInfo = do st <- ServerMonad get
                  config <- liftIO $ getConfig (ss_directory st)
                  return $ lookup (ss_user st) $ config_clients config
 
+getDirectory :: ServerMonad Directory
+getDirectory = do st <- ServerMonad get
+                  return $ ss_directory st
+
 getNotifierVar :: ServerMonad NVar
-getNotifierVar = do st <- ServerMonad get
-                    return $ dir_notifierVar $ ss_directory st
+getNotifierVar = liftM dir_notifierVar $ getDirectory
 
 instance HandlelikeM ServerMonad where
     hlPutStrLn str = do h <- getHandleOrSsl
@@ -96,7 +102,8 @@ instance HandlelikeM ServerMonad where
 
 data Directory = Directory {
                      dir_notifierVar :: NVar,
-                     dir_configHandlerVar :: CHVar
+                     dir_configHandlerVar :: CHVar,
+                     dir_timeMasterVar :: TimeMasterVar
                  }
 
 getConfig :: Directory -> IO Config
