@@ -32,6 +32,7 @@ import System.FilePath
 import System.IO
 import System.Locale
 import System.Posix.Env
+import System.Posix.Signals
 
 main :: IO ()
 main = do hSetBuffering stdout LineBuffering
@@ -76,11 +77,16 @@ runServer v =
        configHandlerVar <- newEmptyMVar
        persistentThread v "Notification" (notifier notifierVar)
        persistentThread v "Config handler" (configHandler configHandlerVar)
+       installHandler sigHUP (Catch (gotSigHUP v configHandlerVar)) Nothing
        addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
                sClose
                (listenForClients v notifierVar configHandlerVar serveraddr)
+
+gotSigHUP :: Verbosity -> CHVar -> IO ()
+gotSigHUP v chv = do verbose' v Main "Reloading config"
+                     putMVar chv ReloadConfig
 
 persistentThread :: Verbosity -> String -> IO () -> IO ()
 persistentThread v title f
@@ -202,12 +208,13 @@ verbose' v w str
               t = formatTime defaultTimeLocale fmt tod
           putStrLn (unwords [t, pprWho w, str])
 
-data Who = User User | Unauthed | Notifier
+data Who = User User | Unauthed | Notifier | Main
 
 pprWho :: Who -> String
 pprWho (User u) = "[U:" ++ u ++ "]"
 pprWho Unauthed = "[unauthed]"
 pprWho Notifier = "[notifier]"
+pprWho Main     = "[main]"
 
 sendHandle :: Handlelike h => Verbosity -> h -> Response -> String -> IO ()
 sendHandle v h resp str
