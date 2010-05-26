@@ -82,9 +82,9 @@ runServer v =
        persistentThread v directory "Notification" (notifier directory)
        persistentThread v directory "Config handler" (configHandler configHandlerVar)
        persistentThread v directory "Time" (timeMaster timeMasterVar)
-       installHandler sigHUP
-                      (Catch (gotSigHUP v directory))
-                      Nothing
+       _ <- installHandler sigHUP
+                           (Catch (gotSigHUP v directory))
+                           Nothing
        addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
        let serveraddr = head addrinfos
        bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
