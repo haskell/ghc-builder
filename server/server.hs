@@ -38,8 +38,10 @@ main = do hSetBuffering stdout LineBuffering
           hSetBuffering stderr LineBuffering
           args <- getArgs
           case args of
-              []              -> withSocketsDo $ withOpenSSL $ runServer Normal
-              ["-v"]          -> withSocketsDo $ withOpenSSL $ runServer Verbose
+              []              -> runServer Nothing  Normal
+              ["-v"]          -> runServer Nothing  Verbose
+              ["-o", o]       -> runServer (Just o) Normal
+              ["-v", "-o", o] -> runServer (Just o) Verbose
               ["init"]        -> initServer
               ["add", client] -> addClient client
               _               -> die "Bad args"
@@ -70,8 +72,8 @@ addClient client
                   putStrLn "OK, client added"
     where isOKChar c = isAlphaNum c || c == '-' || c == '_'
 
-runServer :: Verbosity -> IO ()
-runServer v =
+runServer :: Maybe FilePath -> Verbosity -> IO ()
+runServer mfp v = withSocketsDo $ withOpenSSL $
     do messagerVar <- newEmptyMVar
        notifierVar <- newEmptyMVar
        configHandlerVar <- newEmptyMVar
@@ -82,7 +84,10 @@ runServer v =
                            dir_configHandlerVar = configHandlerVar,
                            dir_timeMasterVar = timeMasterVar
                        }
-       persistentThread "Messager"       (messager directory Nothing v)
+           mfph = case mfp of
+                  Nothing -> Nothing
+                  Just fp -> Just (fp, Nothing)
+       persistentThread "Messager"       (messager directory mfph v)
        persistentThread "Notification"   (notifier directory)
        persistentThread "Config handler" (configHandler configHandlerVar)
        persistentThread "Time"           (timeMaster timeMasterVar)
