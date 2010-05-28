@@ -192,7 +192,7 @@ authClient directory h mu
                        | isJust mu && (Just user /= mu) ->
                           authFailed "User doesn't match SSL certificate CN"
                        | otherwise ->
-                          do tod <- getTODinTZ directory (ui_timezone ui)
+                          do tod <- getTodInTz directory (ui_timezone ui)
                              sendHandle directory h respOK "authenticated"
                              let serverState = mkServerState
                                                    h user directory tod
@@ -222,9 +222,9 @@ verbose str = do directory <- getDirectory
 
 verbose' :: Directory -> Who -> String -> IO ()
 verbose' directory w str
- = do tod <- getTODinTZ directory "UTC"
+ = do lt <- getLocalTimeInTz directory "UTC"
       let fmt = "[%Y-%m-%d %H:%M:%S]"
-          t = formatTime defaultTimeLocale fmt tod
+          t = formatTime defaultTimeLocale fmt lt
       putMVar (dir_messagerVar directory)
               (Message Verbose $ unwords [t, pprWho w, str])
 
@@ -314,7 +314,7 @@ answerLastUploaded
 answerResetTime :: UserInfo -> ServerMonad ()
 answerResetTime ui = do let tz = ui_timezone ui
                         directory <- getDirectory
-                        current <- liftIO $ getTODinTZ directory tz
+                        current <- liftIO $ getTodInTz directory tz
                         setLastReadyTime current
                         sendClient respOK "Done"
 
@@ -330,7 +330,7 @@ answerReady ui
                   do prev <- getLastReadyTime
                      let tz = ui_timezone ui
                      directory <- getDirectory
-                     current <- liftIO $ getTODinTZ directory tz
+                     current <- liftIO $ getTodInTz directory tz
                      setLastReadyTime current
                      if scheduledTimePassed prev current tod
                          then return (StartBuild scheduled)
@@ -421,9 +421,12 @@ scheduledTimePassed lastTime curTime scheduledTime
       -- the clock has wrapped, then the time has passed:
    || ((scheduledTime <= curTime) && (curTime < lastTime))
 
-getTODinTZ :: Directory -> String -> IO TimeOfDay
-getTODinTZ directory tz
+getLocalTimeInTz :: Directory -> String -> IO LocalTime
+getLocalTimeInTz directory tz
  = do mv <- newEmptyMVar
       putMVar (dir_timeMasterVar directory) (tz, mv)
       takeMVar mv
+
+getTodInTz :: Directory -> String -> IO TimeOfDay
+getTodInTz directory tz = liftM localTimeOfDay $ getLocalTimeInTz directory tz
 

@@ -29,7 +29,7 @@ type CHVar = MVar ConfigHandlerRequest
 
 type MessagerVar = MVar MessagerRequest
 
-type TimeMasterVar = MVar (String, MVar TimeOfDay)
+type TimeMasterVar = MVar (String, MVar LocalTime)
 
 data ConfigHandlerRequest = ReloadConfig
                           | GiveMeConfig (MVar Config)
