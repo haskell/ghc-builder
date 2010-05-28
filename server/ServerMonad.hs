@@ -3,12 +3,12 @@
 
 module ServerMonad (
                     ServerMonad, evalServerMonad, mkServerState,
-                    getVerbosity, getUser,
+                    getUser,
                     getLastReadyTime, setLastReadyTime,
                     getUserInfo,
                     getDirectory, getNotifierVar,
                     -- XXX Don't really belong here:
-                    Directory(..),
+                    Directory(..), MessagerRequest(..),
                     getConfig,
                     NVar,
                     CHVar, ConfigHandlerRequest(..),
@@ -27,10 +27,15 @@ type NVar = MVar (User, BuildNum)
 
 type CHVar = MVar ConfigHandlerRequest
 
+type MessagerVar = MVar MessagerRequest
+
 type TimeMasterVar = MVar (String, MVar TimeOfDay)
 
 data ConfigHandlerRequest = ReloadConfig
                           | GiveMeConfig (MVar Config)
+
+data MessagerRequest = Message Verbosity String
+                     | Reopen
 
 baseDir :: FilePath
 baseDir = "data"
@@ -41,28 +46,22 @@ newtype ServerMonad a = ServerMonad (StateT ServerState IO a)
 data ServerState = ServerState {
                        ss_handleOrSsl :: HandleOrSsl,
                        ss_user :: String,
-                       ss_verbosity :: Verbosity,
                        ss_directory :: Directory,
                        ss_last_ready_time :: TimeOfDay
                    }
 
-mkServerState :: HandleOrSsl -> User -> Verbosity -> Directory -> TimeOfDay
+mkServerState :: HandleOrSsl -> User -> Directory -> TimeOfDay
               -> ServerState
-mkServerState h u v directory lrt
+mkServerState h u directory lrt
     = ServerState {
           ss_handleOrSsl = h,
           ss_user = u,
-          ss_verbosity = v,
           ss_directory = directory,
           ss_last_ready_time = lrt
       }
 
 evalServerMonad :: ServerMonad a -> ServerState -> IO a
 evalServerMonad (ServerMonad m) cs = evalStateT m cs
-
-getVerbosity :: ServerMonad Verbosity
-getVerbosity = do st <- ServerMonad get
-                  return $ ss_verbosity st
 
 getHandleOrSsl :: ServerMonad HandleOrSsl
 getHandleOrSsl = do st <- ServerMonad get
@@ -101,6 +100,7 @@ instance HandlelikeM ServerMonad where
                  liftIO $ hlGet' h n
 
 data Directory = Directory {
+                     dir_messagerVar :: MessagerVar,
                      dir_notifierVar :: NVar,
                      dir_configHandlerVar :: CHVar,
                      dir_timeMasterVar :: TimeMasterVar
