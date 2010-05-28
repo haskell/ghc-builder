@@ -11,6 +11,7 @@ import System.IO
 messager :: Directory -> Maybe (FilePath, Maybe Handle) -> Verbosity -> IO ()
 messager directory (Just (fp, Nothing)) v
  = do h <- openFile fp AppendMode
+      hSetBuffering h LineBuffering
       messager directory (Just (fp, Just h)) v
 messager directory m v
  = do req <- takeMVar (dir_messagerVar directory)
