@@ -6,7 +6,6 @@ import Builder.Utils
 
 import Control.Concurrent.MVar
 import Control.Monad
-import Data.Maybe
 import System.IO
 
 messager :: Directory -> Maybe (FilePath, Maybe Handle) -> Verbosity -> IO ()
