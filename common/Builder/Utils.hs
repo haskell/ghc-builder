@@ -280,6 +280,7 @@ data Instructions = Idle
 
 data BuildTime = Timed TimeOfDay
                | Continuous
+               | NoBuilds
                | Other String
     deriving (Show, Read)
 

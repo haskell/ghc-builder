@@ -335,6 +335,8 @@ answerReady ui
                      if scheduledTimePassed prev current tod
                          then return (StartBuild scheduled)
                          else return Idle
+              NoBuilds ->
+                  return Idle
       sendClient respSizedThingFollows
                  "Your mission, should you choose to accept it, is to:"
       sendSizedThing what
