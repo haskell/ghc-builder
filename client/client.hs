@@ -60,7 +60,7 @@ main = do hSetBuffering stdout LineBuffering
           case args of
               []       -> withSocketsDo $ withOpenSSL $ runClient Normal  mainLoop
               ["-v"]   -> withSocketsDo $ withOpenSSL $ runClient Verbose mainLoop
-              ["--do-build"] -> withSocketsDo $ withOpenSSL $ runClient Verbose (doABuild (StartBuild (Other "manual")))
+              ["--do-build"] -> withSocketsDo $ withOpenSSL $ runClient Verbose (doABuild (StartBuild (Other "manual")) >> liftIO exitSuccess)
               -- XXX user and pass oughtn't really be given on the
               -- commandline, but hey
               ["init", user, pass, host] -> initClient user pass host
