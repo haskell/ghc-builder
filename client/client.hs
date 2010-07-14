@@ -58,8 +58,9 @@ main = do hSetBuffering stdout LineBuffering
           unless rtsSupportsBoundThreads $ die "Not linked with -threaded"
           args <- getArgs
           case args of
-              []       -> withSocketsDo $ withOpenSSL $ runClient Normal
-              ["-v"]   -> withSocketsDo $ withOpenSSL $ runClient Verbose
+              []       -> withSocketsDo $ withOpenSSL $ runClient Normal  mainLoop
+              ["-v"]   -> withSocketsDo $ withOpenSSL $ runClient Verbose mainLoop
+              ["--do-build"] -> withSocketsDo $ withOpenSSL $ runClient Verbose (doABuild (StartBuild (Other "manual")))
               -- XXX user and pass oughtn't really be given on the
               -- commandline, but hey
               ["init", user, pass, host] -> initClient user pass host
@@ -76,17 +77,18 @@ initClient user pass host
       writeBinaryFile (baseSubDir </> "pass") pass
       writeBinaryFile (baseSubDir </> "host") host
 
-runClient :: Verbosity -> IO ()
-runClient v = do curDir <- getCurrentDirectory
-                 let baseDir = curDir </> baseSubDir
-                 host <- readBinaryFile (baseDir </> "host")
-                 connLoop curDir baseDir host
+runClient :: Verbosity -> ClientMonad () -> IO ()
+runClient v mainFun
+    = do curDir <- getCurrentDirectory
+         let baseDir = curDir </> baseSubDir
+         host <- readBinaryFile (baseDir </> "host")
+         connLoop curDir baseDir host
     where connLoop curDir baseDir host
               = do s <- conn host 5
                    verbose' v "Connected."
 
                    let client = mkClientState v host baseDir (Socket s)
-                   evalClientMonad (doClient curDir) client
+                   evalClientMonad (doClient curDir mainFun) client
               `onConnectionDropped` connLoop curDir baseDir host
 
           conn host secs
@@ -108,12 +110,12 @@ runClient v = do curDir <- getCurrentDirectory
                       Network.Socket.connect sock (addrAddress serveraddr)
                       return sock
 
-doClient :: FilePath -> ClientMonad ()
-doClient curDir
+doClient :: FilePath -> ClientMonad () -> ClientMonad ()
+doClient curDir mainFun
  = do startSsl curDir
       authenticate
       uploadAllBuildResults
-      mainLoop
+      mainFun
 
 mainLoop :: ClientMonad ()
 mainLoop
