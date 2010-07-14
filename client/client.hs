@@ -13,6 +13,8 @@ import Builder.Utils
 import Control.Concurrent
 import Control.Exception
 import Control.Monad.State
+import Data.Time.Format
+import Data.Time.LocalTime
 import Network.Socket
 import OpenSSL
 import OpenSSL.Session
@@ -24,6 +26,7 @@ import System.Exit
 import System.FilePath
 import System.IO
 import System.IO.Error hiding (catch)
+import System.Locale
 #ifdef HAVE_SYSTEM_POSIX_RESOURCE
 import System.Posix.Resource
 #endif
@@ -81,22 +84,24 @@ runClient :: Verbosity -> ClientMonad () -> IO ()
 runClient v mainFun
     = do curDir <- getCurrentDirectory
          let baseDir = curDir </> baseSubDir
+         -- Ug, we currently read the user in 2 different places
+         user <- readBinaryFile (baseDir </> "user")
          host <- readBinaryFile (baseDir </> "host")
-         connLoop curDir baseDir host
-    where connLoop curDir baseDir host
-              = do s <- conn host 5
-                   verbose' v "Connected."
+         connLoop curDir baseDir user host
+    where connLoop curDir baseDir user host
+              = do s <- conn user host 5
+                   verbose' v user "Connected."
 
-                   let client = mkClientState v host baseDir (Socket s)
+                   let client = mkClientState v user host baseDir (Socket s)
                    evalClientMonad (doClient curDir mainFun) client
-              `onConnectionDropped` connLoop curDir baseDir host
+              `onConnectionDropped` connLoop curDir baseDir user host
 
-          conn host secs
-              = do verbose' v "Connecting..."
+          conn user host secs
+              = do verbose' v user "Connecting..."
                    c host `onConnectionFailed`
-                          do verbose' v ("Failed...sleeping for " ++ show secs ++ " seconds...")
+                          do verbose' v user ("Failed...sleeping for " ++ show secs ++ " seconds...")
                              threadDelay (secs * 1000000)
-                             conn host ((secs * 2) `min` 600)
+                             conn user host ((secs * 2) `min` 600)
 
           c host = do let hints = defaultHints {
                                       addrSocketType = Stream
@@ -149,10 +154,16 @@ doABuild instructions
 
 verbose :: String -> ClientMonad ()
 verbose str = do v <- getVerbosity
-                 liftIO $ verbose' v str
+                 u <- getUser
+                 liftIO $ verbose' v u str
 
-verbose' :: Verbosity -> String -> IO ()
-verbose' v str = when (v >= Verbose) $ putStrLn str
+verbose' :: Verbosity -> User -> String -> IO ()
+verbose' v u str = when (v >= Verbose)
+                 $ do t <- getZonedTime
+                      let fmt = "[%Y-%m-%d %H:%M:%S]"
+                          t' = zonedTimeToLocalTime t
+                          t'' = formatTime defaultTimeLocale fmt t'
+                      putStrLn $ unwords [t'', "[" ++ u ++ "]", str]
 
 sendServer :: String -> ClientMonad ()
 sendServer str = do verbose ("Sending: " ++ show str)
