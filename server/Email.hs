@@ -38,8 +38,13 @@ sendEmails config u bn url
                                                    Nothing -> ""
                                                    Just x ->
                                                        unlines $ map doLine $ lastN 30 $ lines x
+                                         -- XXX This is a hideous hack:
+                                         lastFew' = map toLatin1 lastFew
+                                         toLatin1 c
+                                          | c > '\xFF' = '?'
+                                          | otherwise  = c
                                          contentType = ContentType "text" "plain" [Parameter "charset" "ISO-8859-1"]
-                                         attachment = (lastFew, "step." ++ stepName ++ ".txt", Just contentType)
+                                         attachment = (lastFew', "step." ++ stepName ++ ".txt", Just contentType)
                                      return ([stepName, "Failure: " ++ show n],
                                              Just attachment)
       bsns <- getSortedNumericDirectoryContents stepsDir
