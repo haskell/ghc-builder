@@ -8,6 +8,7 @@ import Builder.Command
 import Builder.Files
 import Builder.Utils
 
+import Codec.MIME.String.Flatten
 import Codec.MIME.String.Headers
 import Control.Monad
 import Data.Maybe
@@ -22,35 +23,10 @@ sendEmails config u bn url
           buildDir = buildsDir </> show bn
           stepsDir = buildDir </> "steps"
           root = Server (baseDir </> "clients") u
-          mkStep bsn = do stepName <- readBuildStepName root bn bsn
-                          ec <- readBuildStepExitcode root bn bsn
-                          case ec of
-                              ExitSuccess ->
-                                  return ([stepName, "Success"],
-                                          Nothing)
-                              ExitFailure n ->
-                                  do moutput <- getMaybeBuildStepOutput root bn bsn
-                                     let doLine x = case maybeReadSpace x of
-                                                    Nothing -> x
-                                                    Just (Stdout str) -> str
-                                                    Just (Stderr str) -> str
-                                         lastFew = case moutput of
-                                                   Nothing -> ""
-                                                   Just x ->
-                                                       unlines $ map doLine $ lastN 30 $ lines x
-                                         -- XXX This is a hideous hack:
-                                         lastFew' = map toLatin1 lastFew
-                                         toLatin1 c
-                                          | c > '\xFF' = '?'
-                                          | otherwise  = c
-                                         contentType = ContentType "text" "plain" [Parameter "charset" "ISO-8859-1"]
-                                         attachment = (lastFew', "step." ++ stepName ++ ".txt", Just contentType)
-                                     return ([stepName, "Failure: " ++ show n],
-                                             Just attachment)
       bsns <- getSortedNumericDirectoryContents stepsDir
               `onDoesNotExist`
               return []
-      steps <- mapM mkStep bsns
+      steps <- mapM (mkStep root bn) bsns
       result <- readBuildResult root bn
       let (stepDescrs, maybeAttachments) = unzip steps
           buildResult = case result of
@@ -76,4 +52,35 @@ sendEmails config u bn url
           sendMail fromAddress emailAddresses subject
                    body Nothing
                    (catMaybes maybeAttachments)
+
+mkStep :: Root -> BuildNum -> BuildStepNum -> IO ([String], Maybe Attachment)
+mkStep root bn bsn
+    = do stepName <- readBuildStepName root bn bsn
+         ec <- readBuildStepExitcode root bn bsn
+         case ec of
+             ExitSuccess ->
+                 return ([stepName, "Success"],
+                         Nothing)
+             ExitFailure n ->
+                 do moutput <- getMaybeBuildStepOutput root bn bsn
+                    let doLine x = case maybeReadSpace x of
+                                   Nothing -> x
+                                   Just (Stdout str) -> str
+                                   Just (Stderr str) -> str
+                        lastFew = case moutput of
+                                  Nothing -> ""
+                                  Just x ->
+                                      unlines $ map doLine $ lastN 30 $ lines x
+                        -- XXX This is a hideous hack:
+                        lastFew' = map toLatin1 lastFew
+                        toLatin1 c
+                         | c > '\xFF' = '?'
+                         | otherwise  = c
+                        contentType = ContentType "text" "plain"
+                                          [Parameter "charset" "ISO-8859-1"]
+                        attachment = (lastFew',
+                                      "step." ++ stepName ++ ".txt",
+                                      Just contentType)
+                    return ([stepName, "Failure: " ++ show n],
+                            Just attachment)
 
