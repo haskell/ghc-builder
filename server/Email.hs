@@ -70,7 +70,8 @@ mkStep root bn bsn
                         lastFew = case moutput of
                                   Nothing -> ""
                                   Just x ->
-                                      unlines $ map doLine $ lastN 30 $ lines x
+                                      unlines $ shrink30Lines $ map doLine
+                                              $ lastN 30 $ lines x
                         -- XXX This is a hideous hack:
                         lastFew' = map toLatin1 lastFew
                         toLatin1 c
@@ -83,4 +84,31 @@ mkStep root bn bsn
                                       Just contentType)
                     return ([stepName, "Failure: " ++ show n],
                             Just attachment)
+
+shrink30Lines :: [String] -> [String]
+shrink30Lines xs = reverse $ shrink surplus allowances inputs
+    where inputs = map (\str -> (str, length str)) $ reverse xs
+          allowances = replicate 5 300 ++ replicate 10 200 ++ replicate 15 100
+          surplus = getSurplus allowances $ map snd inputs
+
+getSurplus :: [Int] -> [Int] -> Int
+getSurplus allowances vals = sum $ zipWith f allowances (vals ++ repeat 0)
+    where f allowance val = if allowance > val then allowance - val
+                                               else 0
+
+shrink :: Int -> [Int] -> [(String, Int)] -> [String]
+shrink _ _ [] = []
+shrink _ [] _ = error "Too many lines"
+shrink surplus (allowance : as) ((str, len) : xs)
+ | allowance >= len
+    = str : shrink surplus as xs
+ | maxAllowed >= len
+    = str : shrink (maxAllowed - len) as xs
+ | otherwise
+    = let partial = take halfMaxAllowed1 str ++ " [...] " ++
+                    reverse (take halfMaxAllowed2 (reverse str))
+      in partial : shrink 0 as xs
+ where maxAllowed = surplus + allowance
+       halfMaxAllowed1 = maxAllowed `div` 2
+       halfMaxAllowed2 = maxAllowed - halfMaxAllowed1
 
