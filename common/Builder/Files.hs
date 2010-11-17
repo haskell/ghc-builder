@@ -7,20 +7,20 @@ module Builder.Files (
  readBuildStepName,         readMaybeBuildStepName,     writeBuildStepName,
  --
  removeBuildStepSubdir,
- getMaybeBuildStepSubdir,   putMaybeBuildStepSubdir,
- readBuildStepSubdir,       readMaybeBuildStepSubdir,   writeBuildStepSubdir,
+ getMaybeBuildStepSubdir,       putMaybeBuildStepSubdir,
+ readMaybeBuildStepSubdir,      writeBuildStepSubdir,
  --
  removeBuildStepProg,
- getMaybeBuildStepProg,     putMaybeBuildStepProg,
- readBuildStepProg,         readMaybeBuildStepProg,     writeBuildStepProg,
+ getMaybeBuildStepProg,         putMaybeBuildStepProg,
+ readMaybeBuildStepProg,        writeBuildStepProg,
  --
  removeBuildStepArgs,
- getMaybeBuildStepArgs,     putMaybeBuildStepArgs,
- readBuildStepArgs,         readMaybeBuildStepArgs,     writeBuildStepArgs,
+ getMaybeBuildStepArgs,         putMaybeBuildStepArgs,
+ readMaybeBuildStepArgs,        writeBuildStepArgs,
  --
  removeBuildStepMailOutput,
- getMaybeBuildStepMailOutput, putMaybeBuildStepMailOutput,
-                              readMaybeBuildStepMailOutput, writeBuildStepMailOutput,
+ getMaybeBuildStepMailOutput,   putMaybeBuildStepMailOutput,
+ readMaybeBuildStepMailOutput,  writeBuildStepMailOutput,
  --
  removeBuildStepExitcode,
  getMaybeBuildStepExitcode, putMaybeBuildStepExitcode,
@@ -36,7 +36,7 @@ module Builder.Files (
  --
  removeBuildInstructions,
  getMaybeBuildInstructions, putMaybeBuildInstructions,
- readBuildInstructions,                                 writeBuildInstructions,
+                            writeBuildInstructions,
              ) where
 
 import Builder.Utils
@@ -111,11 +111,6 @@ putMaybeBuildStepSubdir :: MonadIO m
 putMaybeBuildStepSubdir root bn bsn m
  = maybeWriteBinaryFile (fpBuildStepSubdir root bn bsn) m
 
-readBuildStepSubdir :: MonadIO m
-                    => Root -> BuildNum -> BuildStepNum -> m FilePath
-readBuildStepSubdir root bn bsn
- = readFromFile $ fpBuildStepSubdir root bn bsn
-
 readMaybeBuildStepSubdir :: MonadIO m
                          => Root -> BuildNum -> BuildStepNum
                          -> m (Maybe FilePath)
@@ -147,9 +142,6 @@ putMaybeBuildStepProg :: MonadIO m
 putMaybeBuildStepProg root bn bsn m
  = maybeWriteBinaryFile (fpBuildStepProg root bn bsn) m
 
-readBuildStepProg :: MonadIO m => Root -> BuildNum -> BuildStepNum -> m String
-readBuildStepProg root bn bsn = readFromFile $ fpBuildStepProg root bn bsn
-
 readMaybeBuildStepProg :: MonadIO m
                        => Root -> BuildNum -> BuildStepNum
                        -> m (Maybe FilePath)
@@ -180,10 +172,6 @@ putMaybeBuildStepArgs :: MonadIO m
                       -> m ()
 putMaybeBuildStepArgs root bn bsn m
  = maybeWriteBinaryFile (fpBuildStepArgs root bn bsn) m
-
-readBuildStepArgs :: MonadIO m
-                  => Root -> BuildNum -> BuildStepNum -> m [String]
-readBuildStepArgs root bn bsn = readFromFile $ fpBuildStepArgs root bn bsn
 
 readMaybeBuildStepArgs :: MonadIO m
                        => Root -> BuildNum -> BuildStepNum
@@ -336,9 +324,6 @@ getMaybeBuildInstructions root bn
 putMaybeBuildInstructions :: MonadIO m => Root -> BuildNum -> Maybe String -> m ()
 putMaybeBuildInstructions root bn m
  = maybeWriteBinaryFile (fpBuildInstructions root bn) m
-
-readBuildInstructions :: MonadIO m => Root -> BuildNum -> m Instructions
-readBuildInstructions root bn = readFromFile $ fpBuildInstructions root bn
 
 writeBuildInstructions :: MonadIO m => Root -> BuildNum -> Instructions -> m ()
 writeBuildInstructions root bn result
