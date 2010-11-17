@@ -1,6 +1,4 @@
 
-{-# LANGUAGE DeriveDataTypeable #-}
-
 module Builder.Utils (
               ProtocolVersion,
               Response,
@@ -19,10 +17,9 @@ module Builder.Utils (
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
               onConnectionDropped, onConnectionFailed,
               Instructions(..),
-              mkTime, UserInfo(..), BuildTime(..), mkUserInfo,
-              BuildInstructions(..), BuildNum, BuildStepNum, BuildStep(..),
-              showTable, noPad, lPad, rPad,
-              Config(..)
+              BuildTime(..),
+              BuildNum, BuildStepNum,
+              showTable, noPad, lPad, rPad
              ) where
 
 import Builder.Handlelike
@@ -34,7 +31,6 @@ import Data.Char
 import Data.Fixed
 import Data.List
 import Data.Time.LocalTime
-import Data.Typeable
 import Prelude hiding (catch)
 import System.Directory
 import System.Exit
@@ -293,21 +289,6 @@ onConnectionDropped io io'
    then io'
    else throwIO e
 
-mkTime :: Int -> Int -> TimeOfDay
-mkTime hour mins = TimeOfDay {
-                       todHour = hour,
-                       todMin = mins,
-                       todSec = 0
-                   }
-
-data UserInfo = UserInfo {
-                    ui_password :: String,
-                    ui_timezone :: String,
-                    ui_buildTime :: BuildTime,
-                    ui_buildInstructions :: [BuildStep]
-                }
-    deriving Typeable
-
 data Instructions = Idle
                   | StartBuild BuildTime
     deriving (Show, Read)
@@ -318,33 +299,9 @@ data BuildTime = Timed TimeOfDay
                | Other String
     deriving (Show, Read)
 
-mkUserInfo :: String -> String -> BuildTime -> [BuildStep] -> UserInfo
-mkUserInfo pass tz bt bis
-    = UserInfo {
-          ui_password = pass,
-          ui_timezone = tz,
-          ui_buildTime = bt,
-          ui_buildInstructions = bis
-      }
-
-data BuildInstructions = BuildInstructions {
-                             bi_instructions :: Instructions,
-                             bi_buildNum :: BuildNum,
-                             bi_buildSteps :: [(BuildStepNum, BuildStep)]
-                         }
-    deriving (Show, Read)
-
 type BuildNum = Integer
 
 type BuildStepNum = Integer
-
-data BuildStep = BuildStep {
-                     bs_name :: String,
-                     bs_subdir :: FilePath,
-                     bs_prog :: FilePath,
-                     bs_args :: [String]
-                 }
-    deriving (Show, Read)
 
 showTable :: [Int -> String -> String] -> [[String]] -> [String]
 showTable padders xss
@@ -359,12 +316,4 @@ lPad n s = replicate (n - length s) ' ' ++ s
 
 rPad :: Int -> String -> String
 rPad n s = s ++ replicate (n - length s) ' '
-
-data Config = Config {
-                  config_fromAddress :: String,
-                  config_emailAddresses :: [String],
-                  config_urlRoot :: String,
-                  config_clients :: [(String, UserInfo)]
-              }
-    deriving Typeable
 

@@ -3,6 +3,7 @@ module ConfigHandler (configHandler) where
 
 import ServerMonad
 
+import Builder.Config
 import Builder.Utils
 
 import GHC

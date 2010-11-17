@@ -5,6 +5,7 @@ module Main (main) where
 
 import ClientMonad
 
+import Builder.BuildSteps
 import Builder.Command
 import Builder.Files
 import Builder.Handlelike

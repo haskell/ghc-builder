@@ -5,6 +5,7 @@ import SendMail
 import ServerMonad
 
 import Builder.Command
+import Builder.Config
 import Builder.Files
 import Builder.Utils
 

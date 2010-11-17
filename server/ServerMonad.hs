@@ -16,6 +16,7 @@ module ServerMonad (
                     baseDir,
                    ) where
 
+import Builder.Config
 import Builder.Handlelike
 import Builder.Utils
 
