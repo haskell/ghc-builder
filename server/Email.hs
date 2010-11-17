@@ -61,10 +61,11 @@ mkStep :: Root -> BuildNum -> BuildStepNum
               Maybe Attachment, -- Failure attachment
               Maybe Attachment) -- Output attachment
 mkStep root bn bsn
-    = do stepName <- readBuildStepName root bn bsn
-         ec <- readBuildStepExitcode root bn bsn
-         case ec of
-             ExitSuccess ->
+    = do mStepName <- readMaybeBuildStepName root bn bsn
+         let stepName = fromMaybe ("step_" ++ show bsn) mStepName
+         mec <- readMaybeBuildStepExitcode root bn bsn
+         case mec of
+             Just ExitSuccess ->
                  do mMailOutput <- readMaybeBuildStepMailOutput root bn bsn
                     mOutputAttachment <-
                         case mMailOutput of
@@ -80,7 +81,7 @@ mkStep root bn bsn
                     return ([stepName, "Success"],
                             Nothing,
                             mOutputAttachment)
-             ExitFailure n ->
+             _ ->
                  do moutput <- getMaybeBuildStepOutput root bn bsn
                     let doLine x = case maybeReadSpace x of
                                    Nothing -> x
@@ -94,7 +95,7 @@ mkStep root bn bsn
                         attachment = mkAttachment
                                          ("step." ++ stepName ++ ".failed.txt")
                                          lastFew
-                    return ([stepName, "Failure: " ++ show n],
+                    return ([stepName, "Failure: " ++ show mec],
                             Just attachment,
                             Nothing)
 

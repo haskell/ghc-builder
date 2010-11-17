@@ -8,6 +8,7 @@ import Builder.Config
 import Builder.Files
 import Builder.Utils
 
+import Data.Maybe
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -87,10 +88,11 @@ mkBuildPage u bn bsns
  = do let root = Server (baseDir </> "clients") u
           relPage = "builders" </> u </> show bn <.> "html"
           page = baseDir </> "web" </> relPage
-          mkLink bsn = do stepName <- readBuildStepName root bn bsn
-                          ec <- readBuildStepExitcode root bn bsn
-                          let linkClass = case ec of
-                                          ExitSuccess -> "success"
+          mkLink bsn = do mStepName <- readMaybeBuildStepName root bn bsn
+                          mec <- readMaybeBuildStepExitcode root bn bsn
+                          let stepName = fromMaybe "<<name not found>>" mStepName
+                              linkClass = case mec of
+                                          Just ExitSuccess -> "success"
                                           _ -> "failure"
                           return ((anchor ! [href (show bn </> show bsn <.> "html"),
                                              theclass linkClass])

@@ -3,8 +3,8 @@ module Builder.Files (
  Root(..),
  --
  removeBuildStepName,
- getMaybeBuildStepName,     putMaybeBuildStepName,
- readBuildStepName,         readMaybeBuildStepName,     writeBuildStepName,
+ getMaybeBuildStepName,         putMaybeBuildStepName,
+ readMaybeBuildStepName,        writeBuildStepName,
  --
  removeBuildStepSubdir,
  getMaybeBuildStepSubdir,       putMaybeBuildStepSubdir,
@@ -23,20 +23,20 @@ module Builder.Files (
  readMaybeBuildStepMailOutput,  writeBuildStepMailOutput,
  --
  removeBuildStepExitcode,
- getMaybeBuildStepExitcode, putMaybeBuildStepExitcode,
- readBuildStepExitcode,     readMaybeBuildStepExitcode, writeBuildStepExitcode,
+ getMaybeBuildStepExitcode,     putMaybeBuildStepExitcode,
+ readMaybeBuildStepExitcode,    writeBuildStepExitcode,
  --
  removeBuildStepOutput,
  getMaybeSizedBuildStepOutput,
- getMaybeBuildStepOutput,   putMaybeBuildStepOutput,
+ getMaybeBuildStepOutput,       putMaybeBuildStepOutput,
  --
  removeBuildResult,
- getMaybeBuildResult,       putMaybeBuildResult,
- readBuildResult,                                       writeBuildResult,
+ getMaybeBuildResult,           putMaybeBuildResult,
+ readBuildResult,               writeBuildResult,
  --
  removeBuildInstructions,
- getMaybeBuildInstructions, putMaybeBuildInstructions,
-                            writeBuildInstructions,
+ getMaybeBuildInstructions,     putMaybeBuildInstructions,
+                                writeBuildInstructions,
              ) where
 
 import Builder.Utils
