@@ -1,5 +1,9 @@
 
-module Builder.Utils (Response,
+{-# LANGUAGE DeriveDataTypeable #-}
+
+module Builder.Utils (
+              ProtocolVersion,
+              Response,
               respOK, respSizedThingFollows, respSendSizedThing,
               respHuh, respAuthFailed, respIForgotYou,
               User, Pass, port, Verbosity (..), Result(..),
@@ -27,14 +31,44 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
 import Data.Char
-import Data.Typeable
+import Data.Fixed
 import Data.List
 import Data.Time.LocalTime
+import Data.Typeable
 import Prelude hiding (catch)
 import System.Directory
 import System.Exit
 import System.IO
 import System.IO.Error hiding (catch)
+
+newtype ProtocolVersion = ProtocolVersion Deci
+    deriving (Eq, Num, Fractional)
+
+instance Show ProtocolVersion where
+    showsPrec p (ProtocolVersion d) = showsPrec p d
+
+instance Read ProtocolVersion where
+    readsPrec _ = \s -> [ (ProtocolVersion d, rest)
+                        | (d, rest) <- readsFixed s ]
+
+readsFixed :: (HasResolution a) => ReadS (Fixed a)
+readsFixed = readsSigned
+    where readsSigned ('-' : xs) = [ (negate x, rest)
+                                   | (x, rest) <- readsUnsigned xs ]
+          readsSigned xs = readsUnsigned xs
+          readsUnsigned xs = case span isDigit xs of
+                             ([], _) -> []
+                             (is, xs') ->
+                                 let i = fromInteger (read is)
+                                 in case xs' of
+                                    '.' : xs'' ->
+                                        case span isDigit xs'' of
+                                        ([], _) -> []
+                                        (js, xs''') ->
+                                            let j = fromInteger (read js)
+                                                l = genericLength js :: Integer
+                                            in [(i + (j / (10 ^ l)), xs''')]
+                                    _ -> [(i, xs')]
 
 type Response = Int
 

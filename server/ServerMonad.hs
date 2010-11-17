@@ -46,16 +46,22 @@ newtype ServerMonad a = ServerMonad (StateT ServerState IO a)
 data ServerState = ServerState {
                        ss_handleOrSsl :: HandleOrSsl,
                        ss_user :: String,
+                       ss_protocolVersion :: ProtocolVersion,
                        ss_directory :: Directory,
                        ss_last_ready_time :: TimeOfDay
                    }
 
-mkServerState :: HandleOrSsl -> User -> Directory -> TimeOfDay
+mkServerState :: HandleOrSsl
+              -> User
+              -> ProtocolVersion
+              -> Directory
+              -> TimeOfDay
               -> ServerState
-mkServerState h u directory lrt
+mkServerState h u pv directory lrt
     = ServerState {
           ss_handleOrSsl = h,
           ss_user = u,
+          ss_protocolVersion = pv,
           ss_directory = directory,
           ss_last_ready_time = lrt
       }

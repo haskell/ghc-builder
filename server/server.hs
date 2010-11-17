@@ -121,8 +121,9 @@ listenForClients :: Directory -> AddrInfo -> Socket -> IO ()
 listenForClients directory serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
-      let mainLoop = do (conn, _) <- Network.Socket.accept sock
-                        _ <- forkIO $ startSsl directory conn
+      let defaultProtocolVersion = 0.1
+          mainLoop = do (conn, _) <- Network.Socket.accept sock
+                        _ <- forkIO $ startSsl defaultProtocolVersion directory conn
                         mainLoop
       mainLoop
 
@@ -132,29 +133,40 @@ fpServerPem = "certs/server.pem"
 fpRootPem :: FilePath
 fpRootPem = "certs/root.pem"
 
-startSsl :: Directory -> Socket -> IO ()
-startSsl directory s
+startSsl :: ProtocolVersion -> Directory -> Socket -> IO ()
+startSsl pv directory s
  = do msg <- hlGetLine' s
       verbose' directory Unauthed ("Received: " ++ show msg)
-      case msg of
-          "START SSL" ->
-              do serverPem <- readFile fpServerPem
-                 serverX509 <- readX509 serverPem
-                 serverPrivateKey <- readPrivateKey serverPem (PwStr "password")
-                 sslContext <- context
-                 contextSetCertificate sslContext serverX509
-                 contextSetPrivateKey sslContext serverPrivateKey
-                 contextSetCAFile sslContext fpRootPem
-                 ssl <- OpenSSL.Session.connection sslContext s
-                 OpenSSL.Session.accept ssl
-                 mUser <- verifySsl ssl
-                 sendHandle directory ssl respOK "Welcome to SSL"
-                 authClient directory (Ssl ssl) mUser
-          "NO SSL" ->
-              do sendHandle directory s respOK "OK, no SSL"
-                 authClient directory (Socket s) Nothing
-          _ -> do sendHandle directory s respHuh "Expected SSL instructions"
-                  startSsl directory s
+      case stripPrefix msg "PROTO " of
+          Just verStr ->
+              case maybeRead verStr of
+                  Just pv'
+                   | pv' `elem` [0.1, 0.2] ->
+                      do sendHandle directory s respOK "Protocol version OK"
+                         startSsl pv' directory s
+                  _ ->
+                      do sendHandle directory s respHuh "Protocol version not recognised"
+                         startSsl pv directory s
+          Nothing ->
+              case msg of
+                  "START SSL" ->
+                      do serverPem <- readFile fpServerPem
+                         serverX509 <- readX509 serverPem
+                         serverPrivateKey <- readPrivateKey serverPem (PwStr "password")
+                         sslContext <- context
+                         contextSetCertificate sslContext serverX509
+                         contextSetPrivateKey sslContext serverPrivateKey
+                         contextSetCAFile sslContext fpRootPem
+                         ssl <- OpenSSL.Session.connection sslContext s
+                         OpenSSL.Session.accept ssl
+                         mUser <- verifySsl ssl
+                         sendHandle directory ssl respOK "Welcome to SSL"
+                         authClient pv directory (Ssl ssl) mUser
+                  "NO SSL" ->
+                      do sendHandle directory s respOK "OK, no SSL"
+                         authClient pv directory (Socket s) Nothing
+                  _ -> do sendHandle directory s respHuh "Expected protocol version or SSL instructions"
+                          startSsl pv directory s
 
 verifySsl :: SSL -> IO (Maybe User)
 verifySsl ssl
@@ -174,8 +186,9 @@ verifySsl ssl
                      Nothing ->
                          die "Certificate has no CN"
 
-authClient :: Directory -> HandleOrSsl -> Maybe User -> IO ()
-authClient directory h mu
+authClient :: ProtocolVersion -> Directory -> HandleOrSsl -> Maybe User
+           -> IO ()
+authClient pv directory h mu
  = do msg <- hlGetLine' h
       verbose' directory Unauthed ("Received: " ++ show msg)
       config <- getConfig directory
@@ -195,25 +208,25 @@ authClient directory h mu
                           do tod <- getTodInTz directory (ui_timezone ui)
                              sendHandle directory h respOK "authenticated"
                              let serverState = mkServerState
-                                                   h user directory tod
+                                                   h user pv directory tod
                              evalServerMonad handleClient serverState
                                  `finally`
                                  verbose' directory (User user) "Disconnected"
                   _ ->
                       do sendHandle directory h respHuh "I don't understand"
-                         authClient directory h mu
+                         authClient pv directory h mu
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
                       do sendHandle directory h respHuh "I don't understand"
-                         authClient directory h mu
+                         authClient pv directory h mu
                   _ ->
                       do sendHandle directory h respHuh "I don't understand"
-                         authClient directory h mu
+                         authClient pv directory h mu
     where authFailed reason = do verbose' directory Unauthed ("Auth failed: " ++ reason)
                                  sendHandle directory h respAuthFailed "auth failed"
-                                 authClient directory h mu
+                                 authClient pv directory h mu
 
 verbose :: String -> ServerMonad ()
 verbose str = do directory <- getDirectory
