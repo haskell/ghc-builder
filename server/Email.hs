@@ -29,7 +29,8 @@ sendEmails config u bn url
               return []
       steps <- mapM (mkStep root bn) bsns
       result <- readBuildResult root bn
-      let (stepDescrs, maybeAttachments) = unzip steps
+      let (stepDescrs, maybeFailureAttachments, maybeOutputAttachments)
+              = unzip3 steps
           buildResult = case result of
                         Success -> "Build succeeded"
                         Failure -> "Build failed"
@@ -52,16 +53,33 @@ sendEmails config u bn url
       unless (null emailAddresses) $
           sendMail fromAddress emailAddresses subject
                    body Nothing
-                   (catMaybes maybeAttachments)
+                   (catMaybes maybeFailureAttachments ++
+                    catMaybes maybeOutputAttachments)
 
-mkStep :: Root -> BuildNum -> BuildStepNum -> IO ([String], Maybe Attachment)
+mkStep :: Root -> BuildNum -> BuildStepNum
+       -> IO ([String],         -- Step description
+              Maybe Attachment, -- Failure attachment
+              Maybe Attachment) -- Output attachment
 mkStep root bn bsn
     = do stepName <- readBuildStepName root bn bsn
          ec <- readBuildStepExitcode root bn bsn
          case ec of
              ExitSuccess ->
-                 return ([stepName, "Success"],
-                         Nothing)
+                 do mMailOutput <- readMaybeBuildStepMailOutput root bn bsn
+                    mOutputAttachment <-
+                        case mMailOutput of
+                        Just True ->
+                            do mXs <- getMaybeBuildStepOutput root bn bsn
+                               let xs = fromMaybe "" mXs
+                                   filename = "step." ++ stepName ++
+                                              ".output.txt"
+                                   attachment = mkAttachment filename xs
+                               return (Just attachment)
+                        _ ->
+                            return Nothing
+                    return ([stepName, "Success"],
+                            Nothing,
+                            mOutputAttachment)
              ExitFailure n ->
                  do moutput <- getMaybeBuildStepOutput root bn bsn
                     let doLine x = case maybeReadSpace x of
@@ -73,18 +91,23 @@ mkStep root bn bsn
                                   Just x ->
                                       unlines $ shrink30Lines $ map doLine
                                               $ lastN 30 $ lines x
-                        -- XXX This is a hideous hack:
-                        lastFew' = map toLatin1 lastFew
-                        toLatin1 c
-                         | c > '\xFF' = '?'
-                         | otherwise  = c
-                        contentType = ContentType "text" "plain"
-                                          [Parameter "charset" "ISO-8859-1"]
-                        attachment = (lastFew',
-                                      "step." ++ stepName ++ ".txt",
-                                      Just contentType)
+                        attachment = mkAttachment
+                                         ("step." ++ stepName ++ ".failed.txt")
+                                         lastFew
                     return ([stepName, "Failure: " ++ show n],
-                            Just attachment)
+                            Just attachment,
+                            Nothing)
+
+mkAttachment :: FilePath -> String -> Attachment
+mkAttachment filename str
+    = (-- XXX This is a hideous hack:
+       map toLatin1 str,
+       filename,
+       Just contentType)
+    where toLatin1 c | c > '\xFF' = '?'
+                     | otherwise  = c
+          contentType = ContentType "text" "plain"
+                                    [Parameter "charset" "ISO-8859-1"]
 
 shrink30Lines :: [String] -> [String]
 shrink30Lines xs = reverse $ shrink surplus allowances inputs

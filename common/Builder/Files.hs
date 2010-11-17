@@ -18,6 +18,10 @@ module Builder.Files (
  getMaybeBuildStepArgs,     putMaybeBuildStepArgs,
  readBuildStepArgs,         readMaybeBuildStepArgs,     writeBuildStepArgs,
  --
+ removeBuildStepMailOutput,
+ getMaybeBuildStepMailOutput, putMaybeBuildStepMailOutput,
+                              readMaybeBuildStepMailOutput, writeBuildStepMailOutput,
+ --
  removeBuildStepExitcode,
  getMaybeBuildStepExitcode, putMaybeBuildStepExitcode,
  readBuildStepExitcode,     readMaybeBuildStepExitcode, writeBuildStepExitcode,
@@ -191,6 +195,39 @@ writeBuildStepArgs :: MonadIO m
                    => Root -> BuildNum -> BuildStepNum -> [String] -> m ()
 writeBuildStepArgs root bn bsn args
  = writeBinaryFile (fpBuildStepArgs root bn bsn) (show args)
+
+--
+
+fpBuildStepMailOutput :: Root -> BuildNum -> BuildStepNum -> FilePath
+fpBuildStepMailOutput root bn bsn = mkPath root (dirBuildStep bn bsn </> "mailOutput")
+
+removeBuildStepMailOutput :: MonadIO m
+                          => Root -> BuildNum -> BuildStepNum -> m ()
+removeBuildStepMailOutput root bn bsn
+ = liftIO $ ignoreDoesNotExist $ removeFile (fpBuildStepMailOutput root bn bsn)
+
+getMaybeBuildStepMailOutput :: MonadIO m
+                            => Root -> BuildNum -> BuildStepNum
+                            -> m (Maybe String)
+getMaybeBuildStepMailOutput root bn bsn
+ = maybeReadBinaryFile (fpBuildStepMailOutput root bn bsn)
+
+putMaybeBuildStepMailOutput :: MonadIO m
+                            => Root -> BuildNum -> BuildStepNum -> Maybe String
+                            -> m ()
+putMaybeBuildStepMailOutput root bn bsn m
+ = maybeWriteBinaryFile (fpBuildStepMailOutput root bn bsn) m
+
+readMaybeBuildStepMailOutput :: MonadIO m
+                             => Root -> BuildNum -> BuildStepNum
+                             -> m (Maybe Bool)
+readMaybeBuildStepMailOutput root bn bsn
+ = maybeReadFromFile $ fpBuildStepMailOutput root bn bsn
+
+writeBuildStepMailOutput :: MonadIO m
+                         => Root -> BuildNum -> BuildStepNum -> Bool -> m ()
+writeBuildStepMailOutput root bn bsn args
+ = writeBinaryFile (fpBuildStepMailOutput root bn bsn) (show args)
 
 --
 

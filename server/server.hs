@@ -366,6 +366,7 @@ answerReady ui
 receiveBuildStep :: BuildNum -> BuildStepNum -> ServerMonad ()
 receiveBuildStep buildNum buildStepNum
  = do user <- getUser
+      pv <- getProtocolVersion
       let root = Server (baseDir </> "clients") user
           userDir = baseDir </> "clients" </> user
           buildDir = userDir </> "builds" </> show buildNum
@@ -390,6 +391,11 @@ receiveBuildStep buildNum buildStepNum
       sendClient respSendSizedThing "Send args"
       margs <- getMaybeSizedThing
       putMaybeBuildStepArgs root buildNum buildStepNum margs
+      -- Get the mailOutput
+      unless (pv == 0.1) $ do
+          sendClient respSendSizedThing "Send mailOutput"
+          mMailOutput <- getMaybeSizedThing
+          putMaybeBuildStepMailOutput root buildNum buildStepNum mMailOutput
       -- Get the exit code
       sendClient respSendSizedThing "Send exit code"
       mec <- getMaybeSizedThing

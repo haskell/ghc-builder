@@ -118,7 +118,9 @@ runClient v mainFun
 
 doClient :: FilePath -> ClientMonad () -> ClientMonad ()
 doClient curDir mainFun
- = do startSsl curDir
+ = do sendServer "PROTO 0.2"
+      getTheResponseCode respOK
+      startSsl curDir
       authenticate
       uploadAllBuildResults
       mainFun
@@ -266,17 +268,19 @@ runBuildStep bn (bsn, bs)
  = do liftIO $ putStrLn ("Running " ++ show (bs_name bs))
       baseDir <- getBaseDir
       tempBuildDir <- getTempBuildDir
-      let root   = Client baseDir
-          name   = bs_name   bs
-          subdir = bs_subdir bs
-          prog   = bs_prog   bs
-          args   = bs_args   bs
+      let root         = Client baseDir
+          name         = bs_name       bs
+          subdir       = bs_subdir     bs
+          prog         = bs_prog       bs
+          args         = bs_args       bs
+          mailOutput   = bs_mailOutput bs
           buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
       liftIO $ createDirectory buildStepDir
-      writeBuildStepName     root bn bsn name
-      writeBuildStepSubdir   root bn bsn subdir
-      writeBuildStepProg     root bn bsn prog
-      writeBuildStepArgs     root bn bsn args
+      writeBuildStepName       root bn bsn name
+      writeBuildStepSubdir     root bn bsn subdir
+      writeBuildStepProg       root bn bsn prog
+      writeBuildStepArgs       root bn bsn args
+      writeBuildStepMailOutput root bn bsn mailOutput
       ec <- liftIO $ withCurrentDirectory (tempBuildDir </> subdir)
                    $ run prog args (buildStepDir </> "output")
       writeBuildStepExitcode root bn bsn ec
@@ -321,17 +325,19 @@ uploadBuildResults bn
                                   getMaybeBuildStepSubdir      root bn bsn,
                                   getMaybeBuildStepProg        root bn bsn,
                                   getMaybeBuildStepArgs        root bn bsn,
+                                  getMaybeBuildStepMailOutput  root bn bsn,
                                   getMaybeBuildStepExitcode    root bn bsn]
                    sendServer ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendString strings
                    sendSizedString (getMaybeSizedBuildStepOutput root bn bsn)
                    getTheResponseCode respOK
-                   removeBuildStepName     root bn bsn
-                   removeBuildStepSubdir   root bn bsn
-                   removeBuildStepProg     root bn bsn
-                   removeBuildStepArgs     root bn bsn
-                   removeBuildStepExitcode root bn bsn
-                   removeBuildStepOutput   root bn bsn
+                   removeBuildStepName       root bn bsn
+                   removeBuildStepSubdir     root bn bsn
+                   removeBuildStepProg       root bn bsn
+                   removeBuildStepArgs       root bn bsn
+                   removeBuildStepMailOutput root bn bsn
+                   removeBuildStepExitcode   root bn bsn
+                   removeBuildStepOutput     root bn bsn
                    liftIO $ removeDirectory stepDir
       bsns <- liftIO $ getSortedNumericDirectoryContents stepsDir
       mapM_ sendStep bsns
