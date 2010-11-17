@@ -140,7 +140,7 @@ startSsl :: ProtocolVersion -> Directory -> Socket -> IO ()
 startSsl pv directory s
  = do msg <- hlGetLine' s
       verbose' directory Unauthed ("Received: " ++ show msg)
-      case stripPrefix msg "PROTO " of
+      case stripPrefix "PROTO " msg of
           Just verStr ->
               case maybeRead verStr of
                   Just pv'
