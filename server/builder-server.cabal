@@ -17,7 +17,9 @@ Executable builder-server
 
     Ghc-Options: -threaded
     Ghc-Options: -Wall
-    Extensions: PatternGuards, ForeignFunctionInterface
+    Extensions: PatternGuards, ForeignFunctionInterface,
+                MultiParamTypeClasses, FunctionalDependencies,
+                UndecidableInstances
     Build-Depends: base        >= 4   && < 5,
                    builder-lib == 0.1,
                    directory   >= 1.0 && < 1.3,

@@ -4,6 +4,7 @@
 module ServerMonad (
                     ServerMonad, evalServerMonad, mkServerState,
                     getUser,
+                    getProtocolVersion,
                     getLastReadyTime, setLastReadyTime,
                     getUserInfo,
                     getDirectory, getNotifierVar,
@@ -77,6 +78,10 @@ getHandleOrSsl = do st <- ServerMonad get
 getUser :: ServerMonad String
 getUser = do st <- ServerMonad get
              return $ ss_user st
+
+getProtocolVersion :: ServerMonad ProtocolVersion
+getProtocolVersion = do st <- ServerMonad get
+                        return $ ss_protocolVersion st
 
 getLastReadyTime :: ServerMonad TimeOfDay
 getLastReadyTime = do st <- ServerMonad get

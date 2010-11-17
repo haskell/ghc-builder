@@ -1,6 +1,7 @@
 
 module Main where
 
+import qualified BuildSteps_0_1 as BS_0_1
 import ConfigHandler
 import Messager
 import Notification
@@ -313,8 +314,12 @@ answerBuildInstructions ui
                 Idle ->
                     -- XXX The client did something odd if we get here
                     ui_buildInstructions ui
+      pv <- getProtocolVersion
+      let buildInstructions = mkBuildInstructions instructions thisBuildNum bss
       sendClient respSizedThingFollows "Instructions follow"
-      sendSizedThing $ mkBuildInstructions instructions thisBuildNum bss
+      case pv of
+          0.1 -> sendSizedThing $ BS_0_1.fromCurrent buildInstructions
+          _   -> sendSizedThing buildInstructions
       sendClient respOK "That's it"
 
 answerLastUploaded :: ServerMonad ()
