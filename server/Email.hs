@@ -72,9 +72,10 @@ mkStep root bn bsn
                         Just True ->
                             do mXs <- getMaybeBuildStepOutput root bn bsn
                                let xs = fromMaybe "" mXs
+                                   xs' = unlines $ map lineToText $ lines xs
                                    filename = "step." ++ stepName ++
                                               ".output.txt"
-                                   attachment = mkAttachment filename xs
+                                   attachment = mkAttachment filename xs'
                                return (Just attachment)
                         _ ->
                             return Nothing
@@ -83,14 +84,10 @@ mkStep root bn bsn
                             mOutputAttachment)
              _ ->
                  do moutput <- getMaybeBuildStepOutput root bn bsn
-                    let doLine x = case maybeReadSpace x of
-                                   Nothing -> x
-                                   Just (Stdout str) -> str
-                                   Just (Stderr str) -> str
-                        lastFew = case moutput of
+                    let lastFew = case moutput of
                                   Nothing -> ""
                                   Just x ->
-                                      unlines $ shrink30Lines $ map doLine
+                                      unlines $ shrink30Lines $ map lineToText
                                               $ lastN 30 $ lines x
                         attachment = mkAttachment
                                          ("step." ++ stepName ++ ".failed.txt")
@@ -98,6 +95,12 @@ mkStep root bn bsn
                     return ([stepName, "Failure: " ++ show mec],
                             Just attachment,
                             Nothing)
+
+lineToText :: String -> String
+lineToText x = case maybeReadSpace x of
+               Nothing -> x
+               Just (Stdout str) -> str
+               Just (Stderr str) -> str
 
 mkAttachment :: FilePath -> String -> Attachment
 mkAttachment filename str
