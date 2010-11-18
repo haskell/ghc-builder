@@ -18,7 +18,5 @@ In the Big Changeover:
 * Protocol version
 * Don't send password; send hash(salt;password) instead
 * Add build "flunk"ing. Use for testsuite.
-* Get the testsuite summary into the e-mails somehow.
-  And on the webpage, too.
 * Add a way for "results" (e.g. bindists) to be uploaded
 
