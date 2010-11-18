@@ -40,16 +40,13 @@ mkStepPage u bn bsn
           maybeToShowHtml Nothing  = (thespan ! [theclass "missing"])
                                          (stringToHtml "Missing")
           maybeToShowHtml (Just x) = stringToHtml (show x)
-      mstepName <- readMaybeBuildStepName     root bn bsn
-      msubdir   <- readMaybeBuildStepSubdir   root bn bsn
-      mprog     <- readMaybeBuildStepProg     root bn bsn
-      margs     <- readMaybeBuildStepArgs     root bn bsn
-      mec       <- readMaybeBuildStepExitcode root bn bsn
-      moutput   <- getMaybeBuildStepOutput    root bn bsn
-      let output = case moutput of
-                   Just x -> lines x
-                   Nothing -> []
-          descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
+      mstepName  <- readMaybeBuildStepName     root bn bsn
+      msubdir    <- readMaybeBuildStepSubdir   root bn bsn
+      mprog      <- readMaybeBuildStepProg     root bn bsn
+      margs      <- readMaybeBuildStepArgs     root bn bsn
+      mec        <- readMaybeBuildStepExitcode root bn bsn
+      outputHtml <- getOutputHtml              root bn bsn
+      let descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
           html = header headerHtml
              +++ body bodyHtml
           bodyHtml = h1 descriptionHtml
@@ -66,18 +63,6 @@ mkStepPage u bn bsn
                  (stringToHtml "Program: " +++ maybeToShowHtml mprog +++ br +++
                   stringToHtml "Args: "    +++ maybeToShowHtml margs +++ br +++
                   stringToHtml "Subdir: "  +++ maybeToShowHtml msubdir)
-          outputHtml = (pre ! [theclass "output"])
-                           (concatHtml $ map doLine output)
-          doLine lineStr = case maybeReadSpace lineStr of
-                           Just (Stdout line) ->
-                               (thediv ! [theclass "stdout"])
-                                   (stringToHtml line)
-                           Just (Stderr line) ->
-                               (thediv ! [theclass "stderr"])
-                                   (stringToHtml line)
-                           Nothing ->
-                               (thediv ! [theclass "panic"])
-                                   (stringToHtml lineStr)
           resultHtml = (thediv ! [theclass "result"])
                            (stringToHtml "Result: " +++ maybeToShowHtml mec)
           str = renderHtml html
@@ -88,17 +73,9 @@ mkBuildPage u bn bsns
  = do let root = Server (baseDir </> "clients") u
           relPage = "builders" </> u </> show bn <.> "html"
           page = baseDir </> "web" </> relPage
-          mkLink bsn = do mStepName <- readMaybeBuildStepName root bn bsn
-                          mec <- readMaybeBuildStepExitcode root bn bsn
-                          let stepName = fromMaybe "<<name not found>>" mStepName
-                              linkClass = case mec of
-                                          Just ExitSuccess -> "success"
-                                          _ -> "failure"
-                          return ((anchor ! [href (show bn </> show bsn <.> "html"),
-                                             theclass linkClass])
-                                     (stringToHtml (show bsn ++ ": " ++ stepName)))
-      links <- mapM mkLink bsns
+      links <- mapM (mkLink root bn) bsns
       result <- readBuildResult root bn
+      outputs <- mapM (mkOutput root bn) bsns
       let linkClass = case result of
                       Success -> "success"
                       Failure -> "failure"
@@ -111,6 +88,7 @@ mkBuildPage u bn bsns
                  +++ ulist (concatHtml (map li links))
                  +++ (paragraph ! [theclass linkClass])
                          (stringToHtml $ show result)
+                 +++ concatHtml outputs
           headerHtml = thetitle descriptionHtml
                    +++ (thelink ! [rel "Stylesheet",
                                    thetype "text/css",
@@ -119,6 +97,52 @@ mkBuildPage u bn bsns
           str = renderHtml html
       writeBinaryFile page str
       return relPage
+
+mkLink :: Root -> BuildNum -> BuildStepNum -> IO Html
+mkLink root bn bsn
+    = do mStepName <- readMaybeBuildStepName root bn bsn
+         mec <- readMaybeBuildStepExitcode root bn bsn
+         let stepName = fromMaybe "<<name not found>>" mStepName
+             url = show bn </> show bsn <.> "html"
+             linkClass = case mec of
+                         Just ExitSuccess -> "success"
+                         _ -> "failure"
+         return ((anchor ! [href url, theclass linkClass])
+                    (stringToHtml (show bsn ++ ": " ++ stepName)))
+
+mkOutput :: Root -> BuildNum -> BuildStepNum -> IO Html
+mkOutput root bn bsn
+    = do mMailOutput <- readMaybeBuildStepMailOutput root bn bsn
+         case mMailOutput of
+             Just True ->
+                 do mStepName <- readMaybeBuildStepName root bn bsn
+                    outputHtml <- getOutputHtml root bn bsn
+                    let stepName = fromMaybe "<<name not found>>" mStepName
+                        output = hr
+                             +++ h2 (stringToHtml stepName)
+                             +++ outputHtml
+                    return output
+             _ -> return noHtml
+
+getOutputHtml :: Root -> BuildNum -> BuildStepNum -> IO Html
+getOutputHtml root bn bsn
+    = do moutput <- getMaybeBuildStepOutput root bn bsn
+         let output = case moutput of
+                      Just x -> lines x
+                      Nothing -> []
+             outputHtml = (pre ! [theclass "output"])
+                              (concatHtml $ map doLine output)
+             doLine lineStr = case maybeReadSpace lineStr of
+                              Just (Stdout line) ->
+                                  (thediv ! [theclass "stdout"])
+                                      (stringToHtml line)
+                              Just (Stderr line) ->
+                                  (thediv ! [theclass "stderr"])
+                                      (stringToHtml line)
+                              Nothing ->
+                                  (thediv ! [theclass "panic"])
+                                      (stringToHtml lineStr)
+         return outputHtml
 
 -- XXX This should do something:
 mkIndex :: User -> IO ()
