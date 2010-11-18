@@ -8,7 +8,9 @@ import Builder.Config
 import Builder.Files
 import Builder.Utils
 
+import Data.List
 import Data.Maybe
+import Data.Time.Clock.POSIX
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -34,17 +36,21 @@ mkStepPage :: User -> BuildNum -> BuildStepNum -> IO ()
 mkStepPage u bn bsn
  = do let root = Server (baseDir </> "clients") u
           page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
-          maybeToHtml Nothing    = (thespan ! [theclass "missing"])
-                                       (stringToHtml "Missing")
-          maybeToHtml (Just str) = stringToHtml str
-          maybeToShowHtml Nothing  = (thespan ! [theclass "missing"])
-                                         (stringToHtml "Missing")
-          maybeToShowHtml (Just x) = stringToHtml (show x)
-      mstepName  <- readMaybeBuildStepName     root bn bsn
-      msubdir    <- readMaybeBuildStepSubdir   root bn bsn
-      mprog      <- readMaybeBuildStepProg     root bn bsn
-      margs      <- readMaybeBuildStepArgs     root bn bsn
-      mec        <- readMaybeBuildStepExitcode root bn bsn
+          maybeToHtmlWith _ Nothing  = (thespan ! [theclass "missing"])
+                                           (stringToHtml "Missing")
+          maybeToHtmlWith f (Just x) = stringToHtml (f x)
+          maybeToHtml = maybeToHtmlWith id
+          maybeToShowHtml :: Show a => Maybe a -> Html
+          maybeToShowHtml = maybeToHtmlWith show
+          maybeToTimeHtml = maybeToHtmlWith
+                                (show . posixSecondsToUTCTime . fromInteger)
+      mstepName  <- readMaybeBuildStepName      root bn bsn
+      msubdir    <- readMaybeBuildStepSubdir    root bn bsn
+      mprog      <- readMaybeBuildStepProg      root bn bsn
+      margs      <- readMaybeBuildStepArgs      root bn bsn
+      mec        <- readMaybeBuildStepExitcode  root bn bsn
+      mStartTime <- readMaybeBuildStepStartTime root bn bsn
+      mEndTime   <- readMaybeBuildStepEndTime   root bn bsn
       outputHtml <- getOutputHtml              root bn bsn
       let descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
           html = header headerHtml
@@ -58,11 +64,14 @@ mkStepPage u bn bsn
                                    thetype "text/css",
                                    href "../../../css/builder.css"])
                            noHtml
-          summaryHtml
-           = (thediv ! [theclass "summary"])
-                 (stringToHtml "Program: " +++ maybeToShowHtml mprog +++ br +++
-                  stringToHtml "Args: "    +++ maybeToShowHtml margs +++ br +++
-                  stringToHtml "Subdir: "  +++ maybeToShowHtml msubdir)
+          summaryHtml = (thediv ! [theclass "summary"]) summaryLines
+          summaryLines = brLines [
+              stringToHtml "Program: "    +++ maybeToShowHtml mprog,
+              stringToHtml "Args: "       +++ maybeToShowHtml margs,
+              stringToHtml "Subdir: "     +++ maybeToShowHtml msubdir,
+              stringToHtml "Start time: " +++ maybeToTimeHtml mStartTime,
+              stringToHtml "End time: "   +++ maybeToTimeHtml mEndTime]
+          brLines = concatHtml . intersperse br
           resultHtml = (thediv ! [theclass "result"])
                            (stringToHtml "Result: " +++ maybeToShowHtml mec)
           str = renderHtml html

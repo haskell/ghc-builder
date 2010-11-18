@@ -1,6 +1,7 @@
 
 module Builder.Utils (
               ProtocolVersion,
+              StartTime, EndTime,
               Response,
               respOK, respSizedThingFollows, respSendSizedThing,
               respHuh, respAuthFailed, respIForgotYou,
@@ -66,6 +67,9 @@ readsFixed = readsSigned
                                                 l = genericLength js :: Integer
                                             in [(i + (j / (10 ^ l)), xs''')]
                                     _ -> [(i, xs')]
+
+type StartTime = Integer
+type EndTime = Integer
 
 type Response = Int
 

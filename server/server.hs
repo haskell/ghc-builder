@@ -391,11 +391,19 @@ receiveBuildStep buildNum buildStepNum
       sendClient respSendSizedThing "Send args"
       margs <- getMaybeSizedThing
       putMaybeBuildStepArgs root buildNum buildStepNum margs
-      -- Get the mailOutput
       unless (pv == 0.1) $ do
+          -- Get the mailOutput
           sendClient respSendSizedThing "Send mailOutput"
           mMailOutput <- getMaybeSizedThing
           putMaybeBuildStepMailOutput root buildNum buildStepNum mMailOutput
+          -- Get the start time
+          sendClient respSendSizedThing "Send start time"
+          mStartTime <- getMaybeSizedThing
+          putMaybeBuildStepStartTime root buildNum buildStepNum mStartTime
+          -- Get the end time
+          sendClient respSendSizedThing "Send end time"
+          mEndTime <- getMaybeSizedThing
+          putMaybeBuildStepEndTime root buildNum buildStepNum mEndTime
       -- Get the exit code
       sendClient respSendSizedThing "Send exit code"
       mec <- getMaybeSizedThing

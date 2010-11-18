@@ -13,10 +13,7 @@
 * twitter
 * RSS
 * Look at using timezone-series or timezone-olson to better handle timezones
-
-In the Big Changeover:
 * Don't send password; send hash(salt;password) instead
 * Add build "flunk"ing. Use for testsuite.
-* Add a way for "results" (e.g. bindists) to be uploaded
-* Add more times and durations to builds and build steps
+* Add a way for "results" (e.g. bindists) to be uploaded?
 

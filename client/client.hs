@@ -14,6 +14,7 @@ import Builder.Utils
 import Control.Concurrent
 import Control.Exception
 import Control.Monad.State
+import Data.Time.Clock.POSIX
 import Data.Time.Format
 import Data.Time.LocalTime
 import Network.Socket
@@ -266,6 +267,9 @@ runBuildSteps bn (step : steps)
 runBuildStep :: BuildNum -> (BuildStepNum, BuildStep) -> ClientMonad ExitCode
 runBuildStep bn (bsn, bs)
  = do liftIO $ putStrLn ("Running " ++ show (bs_name bs))
+      let getUTCTime = do pt <- liftIO getPOSIXTime
+                          return (floor pt :: Integer)
+      startTime <- getUTCTime
       baseDir <- getBaseDir
       tempBuildDir <- getTempBuildDir
       let root         = Client baseDir
@@ -277,6 +281,7 @@ runBuildStep bn (bsn, bs)
           buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
       liftIO $ createDirectory buildStepDir
       writeBuildStepName       root bn bsn name
+      writeBuildStepStartTime  root bn bsn startTime
       writeBuildStepSubdir     root bn bsn subdir
       writeBuildStepProg       root bn bsn prog
       writeBuildStepArgs       root bn bsn args
@@ -284,6 +289,8 @@ runBuildStep bn (bsn, bs)
       ec <- liftIO $ withCurrentDirectory (tempBuildDir </> subdir)
                    $ run prog args (buildStepDir </> "output")
       writeBuildStepExitcode root bn bsn ec
+      endTime <- getUTCTime
+      writeBuildStepEndTime root bn bsn endTime
       return ec
 
 uploadAllBuildResults :: ClientMonad ()
@@ -326,6 +333,8 @@ uploadBuildResults bn
                                   getMaybeBuildStepProg        root bn bsn,
                                   getMaybeBuildStepArgs        root bn bsn,
                                   getMaybeBuildStepMailOutput  root bn bsn,
+                                  getMaybeBuildStepStartTime   root bn bsn,
+                                  getMaybeBuildStepEndTime     root bn bsn,
                                   getMaybeBuildStepExitcode    root bn bsn]
                    sendServer ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendString strings
@@ -336,6 +345,8 @@ uploadBuildResults bn
                    removeBuildStepProg       root bn bsn
                    removeBuildStepArgs       root bn bsn
                    removeBuildStepMailOutput root bn bsn
+                   removeBuildStepStartTime  root bn bsn
+                   removeBuildStepEndTime    root bn bsn
                    removeBuildStepExitcode   root bn bsn
                    removeBuildStepOutput     root bn bsn
                    liftIO $ removeDirectory stepDir

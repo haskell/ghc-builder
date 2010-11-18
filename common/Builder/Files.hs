@@ -26,6 +26,14 @@ module Builder.Files (
  getMaybeBuildStepExitcode,     putMaybeBuildStepExitcode,
  readMaybeBuildStepExitcode,    writeBuildStepExitcode,
  --
+ removeBuildStepStartTime,
+ getMaybeBuildStepStartTime,    putMaybeBuildStepStartTime,
+ readMaybeBuildStepStartTime,   writeBuildStepStartTime,
+ --
+ removeBuildStepEndTime,
+ getMaybeBuildStepEndTime,      putMaybeBuildStepEndTime,
+ readMaybeBuildStepEndTime,     writeBuildStepEndTime,
+ --
  removeBuildStepOutput,
  getMaybeSizedBuildStepOutput,
  getMaybeBuildStepOutput,       putMaybeBuildStepOutput,
@@ -77,9 +85,6 @@ putMaybeBuildStepName :: MonadIO m
                       -> m ()
 putMaybeBuildStepName root bn bsn m
  = maybeWriteBinaryFile (fpBuildStepName root bn bsn) m
-
-readBuildStepName :: MonadIO m => Root -> BuildNum -> BuildStepNum -> m String
-readBuildStepName root bn bsn = readFromFile $ fpBuildStepName root bn bsn
 
 readMaybeBuildStepName :: MonadIO m
                        => Root -> BuildNum -> BuildStepNum -> m (Maybe String)
@@ -240,11 +245,6 @@ putMaybeBuildStepExitcode :: MonadIO m
 putMaybeBuildStepExitcode root bn bsn m
  = maybeWriteBinaryFile (fpBuildStepExitcode root bn bsn) m
 
-readBuildStepExitcode :: MonadIO m
-                      => Root -> BuildNum -> BuildStepNum -> m ExitCode
-readBuildStepExitcode root bn bsn
- = readFromFile $ fpBuildStepExitcode root bn bsn
-
 readMaybeBuildStepExitcode :: MonadIO m
                            => Root -> BuildNum -> BuildStepNum
                            -> m (Maybe ExitCode)
@@ -255,6 +255,76 @@ writeBuildStepExitcode :: MonadIO m
                        => Root -> BuildNum -> BuildStepNum -> ExitCode -> m ()
 writeBuildStepExitcode root bn bsn exitcode
  = writeBinaryFile (fpBuildStepExitcode root bn bsn) (show exitcode)
+
+--
+
+fpBuildStepStartTime :: Root -> BuildNum -> BuildStepNum -> FilePath
+fpBuildStepStartTime root bn bsn
+ = mkPath root (dirBuildStep bn bsn </> "startTime")
+
+removeBuildStepStartTime :: MonadIO m
+                         => Root -> BuildNum -> BuildStepNum -> m ()
+removeBuildStepStartTime root bn bsn
+ = liftIO $ ignoreDoesNotExist $ removeFile (fpBuildStepStartTime root bn bsn)
+
+getMaybeBuildStepStartTime :: MonadIO m
+                           => Root -> BuildNum -> BuildStepNum
+                           -> m (Maybe String)
+getMaybeBuildStepStartTime root bn bsn
+ = maybeReadBinaryFile (fpBuildStepStartTime root bn bsn)
+
+putMaybeBuildStepStartTime :: MonadIO m
+                           => Root -> BuildNum -> BuildStepNum -> Maybe String
+                           -> m ()
+putMaybeBuildStepStartTime root bn bsn m
+ = maybeWriteBinaryFile (fpBuildStepStartTime root bn bsn) m
+
+readMaybeBuildStepStartTime :: MonadIO m
+                            => Root -> BuildNum -> BuildStepNum
+                            -> m (Maybe StartTime)
+readMaybeBuildStepStartTime root bn bsn
+ = maybeReadFromFile $ fpBuildStepStartTime root bn bsn
+
+writeBuildStepStartTime :: MonadIO m
+                        => Root -> BuildNum -> BuildStepNum -> StartTime
+                        -> m ()
+writeBuildStepStartTime root bn bsn exitcode
+ = writeBinaryFile (fpBuildStepStartTime root bn bsn) (show exitcode)
+
+--
+
+fpBuildStepEndTime :: Root -> BuildNum -> BuildStepNum -> FilePath
+fpBuildStepEndTime root bn bsn
+ = mkPath root (dirBuildStep bn bsn </> "endTime")
+
+removeBuildStepEndTime :: MonadIO m
+                       => Root -> BuildNum -> BuildStepNum -> m ()
+removeBuildStepEndTime root bn bsn
+ = liftIO $ ignoreDoesNotExist $ removeFile (fpBuildStepEndTime root bn bsn)
+
+getMaybeBuildStepEndTime :: MonadIO m
+                         => Root -> BuildNum -> BuildStepNum
+                         -> m (Maybe String)
+getMaybeBuildStepEndTime root bn bsn
+ = maybeReadBinaryFile (fpBuildStepEndTime root bn bsn)
+
+putMaybeBuildStepEndTime :: MonadIO m
+                         => Root -> BuildNum -> BuildStepNum -> Maybe String
+                         -> m ()
+putMaybeBuildStepEndTime root bn bsn m
+ = maybeWriteBinaryFile (fpBuildStepEndTime root bn bsn) m
+
+readMaybeBuildStepEndTime :: MonadIO m
+                          => Root -> BuildNum -> BuildStepNum
+                          -> m (Maybe EndTime)
+readMaybeBuildStepEndTime root bn bsn
+ = maybeReadFromFile $ fpBuildStepEndTime root bn bsn
+
+writeBuildStepEndTime :: MonadIO m
+                      => Root -> BuildNum -> BuildStepNum -> EndTime
+                      -> m ()
+writeBuildStepEndTime root bn bsn exitcode
+ = writeBinaryFile (fpBuildStepEndTime root bn bsn) (show exitcode)
 
 --
 
