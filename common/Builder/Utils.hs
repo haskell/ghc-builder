@@ -31,6 +31,7 @@ import Data.Char
 import Data.Fixed
 import Data.List
 import Data.Time.LocalTime
+import GHC.IO.Exception (IOErrorType(TimeExpired))
 import Prelude hiding (catch)
 import System.Directory
 import System.Exit
@@ -268,6 +269,7 @@ onConnectionFailed :: IO a -> IO a -> IO a
 onConnectionFailed io io'
  = io `catch` \e ->
    if isDoesNotExistError e ||
+      (ioeGetErrorType e == TimeExpired) ||
       -- ioeGetErrorString only gets the right field for user errors,
       -- so we need to change the error type first. Sigh.
       (ioeGetErrorString (ioeSetErrorType e userErrorType) `elem`
