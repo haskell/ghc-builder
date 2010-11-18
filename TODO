@@ -18,4 +18,5 @@ In the Big Changeover:
 * Don't send password; send hash(salt;password) instead
 * Add build "flunk"ing. Use for testsuite.
 * Add a way for "results" (e.g. bindists) to be uploaded
+* Add more times and durations to builds and build steps
 
