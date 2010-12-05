@@ -31,11 +31,14 @@ sendEmails config u bn url
       result <- readBuildResult root bn
       let (stepDescrs, maybeFailureAttachments, maybeOutputAttachments)
               = unzip3 steps
+          builderDescription = case lookup u (config_clients config) of
+                               Just ui -> " (" ++ ui_description ui ++ ")"
+                               Nothing -> ""
           buildResult = case result of
                         Success -> "Build succeeded"
                         Failure -> "Build failed"
                         Incomplete -> "Build incomplete"
-          description = u ++ ", build " ++ show bn
+          description = u ++ builderDescription ++ ", build " ++ show bn
           link = "Details: " ++ url
           bodyLines = [description,
                        "",

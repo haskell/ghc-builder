@@ -21,16 +21,19 @@ mkTime hour mins = TimeOfDay {
 
 data UserInfo = UserInfo {
                     ui_password :: String,
+                    ui_description :: String,
                     ui_timezone :: String,
                     ui_buildTime :: BuildTime,
                     ui_buildInstructions :: [BuildStep]
                 }
     deriving Typeable
 
-mkUserInfo :: String -> String -> BuildTime -> [BuildStep] -> UserInfo
-mkUserInfo pass tz bt bis
+mkUserInfo :: String -> String -> String -> BuildTime -> [BuildStep]
+           -> UserInfo
+mkUserInfo pass desc tz bt bis
     = UserInfo {
           ui_password = pass,
+          ui_description = desc,
           ui_timezone = tz,
           ui_buildTime = bt,
           ui_buildInstructions = bis

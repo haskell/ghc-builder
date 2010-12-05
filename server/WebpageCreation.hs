@@ -28,7 +28,7 @@ createWebPage config u bn
                return []
       createDirectory webBuildDir
       mapM_ (mkStepPage u bn) steps
-      relPage <- mkBuildPage u bn steps
+      relPage <- mkBuildPage config u bn steps
       mkIndex u
       return (urlRoot </> relPage)
 
@@ -77,8 +77,8 @@ mkStepPage u bn bsn
           str = renderHtml html
       writeBinaryFile page str
 
-mkBuildPage :: User -> BuildNum -> [BuildStepNum] -> IO String
-mkBuildPage u bn bsns
+mkBuildPage :: Config -> User -> BuildNum -> [BuildStepNum] -> IO String
+mkBuildPage config u bn bsns
  = do let root = Server (baseDir </> "clients") u
           relPage = "builders" </> u </> show bn <.> "html"
           page = baseDir </> "web" </> relPage
@@ -89,7 +89,10 @@ mkBuildPage u bn bsns
                       Success -> "success"
                       Failure -> "failure"
                       Incomplete -> "incomplete"
-      let description = u ++ ", build " ++ show bn
+          builderDescription = case lookup u (config_clients config) of
+                               Just ui -> " (" ++ ui_description ui ++ ")"
+                               Nothing -> ""
+          description = u ++ builderDescription ++ ", build " ++ show bn
           descriptionHtml = stringToHtml description
           html = header headerHtml
              +++ body bodyHtml
