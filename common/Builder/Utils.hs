@@ -32,7 +32,7 @@ import Data.Char
 import Data.Fixed
 import Data.List
 import Data.Time.LocalTime
-import GHC.IO.Exception (IOErrorType(TimeExpired))
+import GHC.IO.Exception (IOErrorType(TimeExpired, InvalidArgument))
 import Prelude hiding (catch)
 import System.Directory
 import System.Exit
@@ -244,8 +244,14 @@ getSortedNumericDirectoryContents fp
     = liftM sort $ getNumericDirectoryContents fp
 
 getNumericDirectoryContents :: FilePath -> IO [Integer]
-getNumericDirectoryContents fp = do xs <- getDirectoryContents fp
-                                    f xs
+getNumericDirectoryContents fp
+ = do xs <- getDirectoryContents fp
+            -- Thorkil says that the tn23 builder sometimes gets an
+            -- invalid argument exception (happened Oct 31 and Dec 04).
+            -- I don't know what's going on, but in the interests of
+            -- making something work, we treat that as no contents.
+            `onInvalidArgument` return []
+      f xs
     where f [] = return []
           f ("." : xs) = f xs
           f (".." : xs) = f xs
@@ -268,6 +274,11 @@ onDoesNotExist :: IO a -> IO a -> IO a
 onDoesNotExist io io' = io `catch` \e -> if isDoesNotExistError e
                                          then io'
                                          else throwIO e
+
+onInvalidArgument :: IO a -> IO a -> IO a
+onInvalidArgument io io' = io `catch` \e -> case ioeGetErrorType e of
+                                            InvalidArgument -> io'
+                                            _               -> throwIO e
 
 onConnectionFailed :: IO a -> IO a -> IO a
 onConnectionFailed io io'
