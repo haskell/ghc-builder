@@ -125,8 +125,10 @@ listenForClients directory serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let defaultProtocolVersion = 0.1
-          mainLoop = do (conn, _) <- Network.Socket.accept sock
-                        _ <- forkIO $ startSsl defaultProtocolVersion directory conn
+          mainLoop = do (conn, addr) <- Network.Socket.accept sock
+                        let who = Unauthed addr
+                        verbose' directory who "Connection established"
+                        _ <- forkIO $ startSsl defaultProtocolVersion directory who conn
                         mainLoop
       mainLoop
 
@@ -136,20 +138,20 @@ fpServerPem = "certs/server.pem"
 fpRootPem :: FilePath
 fpRootPem = "certs/root.pem"
 
-startSsl :: ProtocolVersion -> Directory -> Socket -> IO ()
-startSsl pv directory s
+startSsl :: ProtocolVersion -> Directory -> Who -> Socket -> IO ()
+startSsl pv directory who s
  = do msg <- hlGetLine' s
-      verbose' directory Unauthed ("Received: " ++ show msg)
+      verbose' directory who ("Received: " ++ show msg)
       case stripPrefix "PROTO " msg of
           Just verStr ->
               case maybeRead verStr of
                   Just pv'
                    | pv' `elem` [0.1, 0.2] ->
-                      do sendHandle directory s respOK "Protocol version OK"
-                         startSsl pv' directory s
+                      do sendHandle directory s who respOK "Protocol version OK"
+                         startSsl pv' directory who s
                   _ ->
-                      do sendHandle directory s respHuh "Protocol version not recognised"
-                         startSsl pv directory s
+                      do sendHandle directory s who respHuh "Protocol version not recognised"
+                         startSsl pv directory who s
           Nothing ->
               case msg of
                   "START SSL" ->
@@ -163,13 +165,13 @@ startSsl pv directory s
                          ssl <- OpenSSL.Session.connection sslContext s
                          OpenSSL.Session.accept ssl
                          mUser <- verifySsl ssl
-                         sendHandle directory ssl respOK "Welcome to SSL"
-                         authClient pv directory (Ssl ssl) mUser
+                         sendHandle directory ssl who respOK "Welcome to SSL"
+                         authClient pv directory (Ssl ssl) who mUser
                   "NO SSL" ->
-                      do sendHandle directory s respOK "OK, no SSL"
-                         authClient pv directory (Socket s) Nothing
-                  _ -> do sendHandle directory s respHuh "Expected protocol version or SSL instructions"
-                          startSsl pv directory s
+                      do sendHandle directory s who respOK "OK, no SSL"
+                         authClient pv directory (Socket s) who Nothing
+                  _ -> do sendHandle directory s who respHuh "Expected protocol version or SSL instructions"
+                          startSsl pv directory who s
 
 verifySsl :: SSL -> IO (Maybe User)
 verifySsl ssl
@@ -189,11 +191,11 @@ verifySsl ssl
                      Nothing ->
                          die "Certificate has no CN"
 
-authClient :: ProtocolVersion -> Directory -> HandleOrSsl -> Maybe User
+authClient :: ProtocolVersion -> Directory -> HandleOrSsl -> Who -> Maybe User
            -> IO ()
-authClient pv directory h mu
+authClient pv directory h who mu
  = do msg <- hlGetLine' h
-      verbose' directory Unauthed ("Received: " ++ show msg)
+      verbose' directory who ("Received: " ++ show msg)
       config <- getConfig directory
       case stripPrefix "AUTH " msg of
           Just xs ->
@@ -209,27 +211,27 @@ authClient pv directory h mu
                           authFailed "User doesn't match SSL certificate CN"
                        | otherwise ->
                           do tod <- getTodInTz directory (ui_timezone ui)
-                             sendHandle directory h respOK "authenticated"
+                             sendHandle directory h who respOK "authenticated"
                              let serverState = mkServerState
                                                    h user pv directory tod
                              evalServerMonad handleClient serverState
                                  `finally`
                                  verbose' directory (User user) "Disconnected"
                   _ ->
-                      do sendHandle directory h respHuh "I don't understand"
-                         authClient pv directory h mu
+                      do sendHandle directory h who respHuh "I don't understand"
+                         authClient pv directory h who mu
           Nothing ->
               case msg of
                   "HELP" ->
                       -- XXX
-                      do sendHandle directory h respHuh "I don't understand"
-                         authClient pv directory h mu
+                      do sendHandle directory h who respHuh "I don't understand"
+                         authClient pv directory h who mu
                   _ ->
-                      do sendHandle directory h respHuh "I don't understand"
-                         authClient pv directory h mu
-    where authFailed reason = do verbose' directory Unauthed ("Auth failed: " ++ reason)
-                                 sendHandle directory h respAuthFailed "auth failed"
-                                 authClient pv directory h mu
+                      do sendHandle directory h who respHuh "I don't understand"
+                         authClient pv directory h who mu
+    where authFailed reason = do verbose' directory who ("Auth failed: " ++ reason)
+                                 sendHandle directory h who respAuthFailed "auth failed"
+                                 authClient pv directory h who mu
 
 verbose :: String -> ServerMonad ()
 verbose str = do directory <- getDirectory
@@ -244,18 +246,19 @@ verbose' directory w str
       putMVar (dir_messagerVar directory)
               (Message Verbose $ unwords [t, pprWho w, str])
 
-data Who = User User | Unauthed | Notifier | Main
+data Who = User User | Unauthed SockAddr | Notifier | Main
 
 pprWho :: Who -> String
 pprWho (User u) = "[U:" ++ u ++ "]"
-pprWho Unauthed = "[unauthed]"
+pprWho (Unauthed a) = "[unauthed:" ++ show a ++ "]"
 pprWho Notifier = "[notifier]"
 pprWho Main     = "[main]"
 
-sendHandle :: Handlelike h => Directory -> h -> Response -> String -> IO ()
-sendHandle directory h resp str
+sendHandle :: Handlelike h
+           => Directory -> h -> Who -> Response -> String -> IO ()
+sendHandle directory h who resp str
  = do let respStr = show resp ++ " " ++ str
-      verbose' directory Unauthed ("Sending: " ++ show respStr)
+      verbose' directory who ("Sending: " ++ show respStr)
       hlPutStrLn' h respStr
 
 sendClient :: Response -> String -> ServerMonad ()
