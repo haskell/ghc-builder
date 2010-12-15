@@ -96,7 +96,9 @@ runClient v mainFun
 
                    let client = mkClientState v user host baseDir (Socket s)
                    evalClientMonad (doClient curDir mainFun) client
-              `onConnectionDropped` connLoop curDir baseDir user host
+              `onConnectionDropped`
+                  do threadDelay (5 * 1000000)
+                     connLoop curDir baseDir user host
 
           conn user host secs
               = do verbose' v user "Connecting..."
