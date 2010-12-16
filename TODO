@@ -1,4 +1,6 @@
 
+* Don't put the build directory so deep (builder/tempbuild/build)
+* Mailing list for commits
 * Add a deafening client verbosity which also prints command output
 * Add SSL instructions to docs
 * Check SSL is actually being used correctly
