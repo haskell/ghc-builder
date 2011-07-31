@@ -69,7 +69,8 @@ loadConfig = do
             Succeeded ->
                 do modGraph <- getModuleGraph
                    loadedModSummaries <- filterM (isLoaded . ms_mod_name) modGraph
-                   let loadedMods = map ms_mod loadedModSummaries
+                   let loadedMods = [ (ms_mod m, Nothing)
+                                    | m <- loadedModSummaries ]
                    setContext [] loadedMods
             Failed ->
                 error "XXX"
