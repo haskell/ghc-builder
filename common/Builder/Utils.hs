@@ -250,7 +250,20 @@ getNumericDirectoryContents fp
             -- invalid argument exception (happened Oct 31 and Dec 04).
             -- I don't know what's going on, but in the interests of
             -- making something work, we treat that as no contents.
-            `onInvalidArgument` return []
+            `catchInvalidArgument` \e ->
+                do warn "Got an InvalidArgument exception in getNumericDirectoryContents"
+                   warn ("Requested numeric directory contents for " ++ show fp)
+                   warn "Exception was:"
+                   mapM_ warn $ map ("    " ++) $ lines $ show e
+                   curDir <- getCurrentDirectory
+                   warn ("Current directory: " ++ show curDir)
+                   warn "Seeing what happens if we try again:"
+                   xs <- getDirectoryContents fp
+                         `catchInvalidArgument` \_ ->
+                             do warn "Exception again"
+                                return []
+                   warn ("Second result: " ++ show xs)
+                   return []
       f xs
     where f [] = return []
           f ("." : xs) = f xs
@@ -275,10 +288,10 @@ onDoesNotExist io io' = io `catch` \e -> if isDoesNotExistError e
                                          then io'
                                          else throwIO e
 
-onInvalidArgument :: IO a -> IO a -> IO a
-onInvalidArgument io io' = io `catch` \e -> case ioeGetErrorType e of
-                                            InvalidArgument -> io'
-                                            _               -> throwIO e
+catchInvalidArgument :: IO a -> (IOException -> IO a) -> IO a
+catchInvalidArgument io f = io `catch` \e -> case ioeGetErrorType e of
+                                             InvalidArgument -> f e
+                                             _               -> throwIO e
 
 onConnectionFailed :: IO a -> IO a -> IO a
 onConnectionFailed io io'
