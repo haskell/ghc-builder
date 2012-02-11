@@ -68,10 +68,10 @@ loadConfig = do
         case ok of
             Succeeded ->
                 do modGraph <- getModuleGraph
-                   loadedModSummaries <- filterM (isLoaded . ms_mod_name) modGraph
-                   let loadedMods = [ (ms_mod m, Nothing)
-                                    | m <- loadedModSummaries ]
-                   setContext [] loadedMods
+                   let modNames = map ms_mod_name modGraph
+                   loadedModNames <- filterM isLoaded modNames
+                   let imps = map (IIDecl . simpleImportDecl) loadedModNames
+                   setContext imps
             Failed ->
                 error "XXX"
         d <- dynCompileExpr "config"
