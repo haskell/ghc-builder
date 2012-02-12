@@ -2,12 +2,9 @@
 * Don't put the build directory so deep (builder/tempbuild/build)
 * Mailing list for commits
 * Add a deafening client verbosity which also prints command output
-* Add SSL instructions to docs
 * Check SSL is actually being used correctly
 * Some sort of client-side locking and server-side check so the same
   client can't run/connect twice
-* More exception handling (e.g. catch the exception when we fail to
-  clean tempbuild, and put it somewhere visible)
 * "validate this bundle please" feature
 * Add a "start build now" button to the web interface
 * e-mail report collation
