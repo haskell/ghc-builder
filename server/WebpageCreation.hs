@@ -154,35 +154,35 @@ getOutputHtml root bn bsn
                                       (stringToHtml lineStr)
          return outputHtml
 
-data IndexData = IndexData {
-                     idNext :: BuildNum,
-                     idBuildResults :: [(BuildNum, Result)]
-                 }
+data BuilderIndexData = BuilderIndexData {
+                            bidNext :: BuildNum,
+                            bidBuildResults :: [(BuildNum, Result)]
+                        }
     deriving (Show, Read)
 
 mkBuilderIndex :: Root -> FilePath -> User -> BuildNum -> Result -> IO ()
 mkBuilderIndex root webBuilderDir u bn result
- = do let indexPage = webBuilderDir </> "index.html"
-          indexDataFile = webBuilderDir </> "index.dat"
-      mIndexData <- maybeReadFromFile indexDataFile
-      buildResults <- case mIndexData of
+ = do let builderIndexPage = webBuilderDir </> "index.html"
+          builderIndexDataFile = webBuilderDir </> "index.dat"
+      mBuilderIndexData <- maybeReadFromFile builderIndexDataFile
+      buildResults <- case mBuilderIndexData of
                       Just i
-                       | idNext i == bn -> return $ idBuildResults i
+                       | bidNext i == bn -> return $ bidBuildResults i
                       _ ->
-                       do warn ("Failed to read " ++ show indexDataFile ++
-                                ". Recreating it.")
+                       do warn ("Failed to read " ++ show builderIndexDataFile
+                             ++ ". Recreating it.")
                           bns <- getBuildNumbers root
                           mapM (\bn' -> do res <- readBuildResult root bn'
                                            return (bn', res))
                                (reverse bns)
       let buildResults' = (bn, result) : buildResults
-          indexData' = IndexData {
-                           idNext = bn + 1,
-                           idBuildResults = buildResults'
-                       }
+          builderIndexData' = BuilderIndexData {
+                                  bidNext = bn + 1,
+                                  bidBuildResults = buildResults'
+                              }
           html = mkBuilderIndexHtml u buildResults'
-      writeToFile indexDataFile indexData'
-      writeBinaryFile indexPage $ renderHtml html
+      writeToFile builderIndexDataFile builderIndexData'
+      writeBinaryFile builderIndexPage $ renderHtml html
 
 mkBuilderIndexHtml :: User -> [(BuildNum, Result)] -> Html
 mkBuilderIndexHtml u xs = header headerHtml
