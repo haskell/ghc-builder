@@ -131,13 +131,18 @@ readBinaryFile :: MonadIO m => FilePath -> m String
 readBinaryFile fp = do h <- liftIO $ openBinaryFile fp ReadMode
                        liftIO $ hGetContents h
 
-maybeReadBinaryFile :: MonadIO m => FilePath -> m (Maybe String)
-maybeReadBinaryFile fp
+maybeReadBinaryFileHandle :: MonadIO m
+                          => FilePath -> m (Maybe (String, Handle))
+maybeReadBinaryFileHandle fp
  = do mh <- liftIO (liftM Just (openBinaryFile fp ReadMode)
                     `onDoesNotExist` return Nothing)
       case mh of
-          Just h -> liftIO $ liftM Just $ hGetContents h
+          Just h -> liftIO $ do str <- hGetContents h
+                                return (Just (str, h))
           Nothing -> return Nothing
+
+maybeReadBinaryFile :: MonadIO m => FilePath -> m (Maybe String)
+maybeReadBinaryFile fp = liftM (fmap fst) $ maybeReadBinaryFileHandle fp
 
 maybeReadSizedBinaryFile :: MonadIO m
                          => FilePath -> m (Maybe (Integer, String))
@@ -226,12 +231,13 @@ readFromFile fp = do xs <- readBinaryFile fp
 
 maybeReadFromFile :: (MonadIO m, Read a) => FilePath -> m (Maybe a)
 maybeReadFromFile fp
- = do mxs <- maybeReadBinaryFile fp
-      case mxs of
-          Just xs ->
+ = do mxsh <- maybeReadBinaryFileHandle fp
+      case mxsh of
+          Just (xs, h) ->
               case maybeRead xs of
                   Nothing ->
-                      return Nothing
+                      do liftIO $ hClose h
+                         return Nothing
                   Just x ->
                       return (Just x)
           Nothing ->

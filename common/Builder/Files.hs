@@ -2,6 +2,8 @@
 module Builder.Files (
  Root(..),
  --
+ getBuildNumbers,
+ --
  removeBuildStepName,
  getMaybeBuildStepName,         putMaybeBuildStepName,
  readMaybeBuildStepName,        writeBuildStepName,
@@ -65,6 +67,11 @@ mkPath (Server root user) fp = root </> user </> fp
 
 dirBuildStep :: BuildNum -> BuildStepNum -> FilePath
 dirBuildStep bn bsn = "builds" </> show bn </> "steps" </> show bsn
+
+--
+
+getBuildNumbers :: Root -> IO [BuildNum]
+getBuildNumbers root = getSortedNumericDirectoryContents (mkPath root "builds")
 
 --
 

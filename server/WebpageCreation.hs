@@ -19,23 +19,25 @@ import Text.XHtml.Strict
 createWebPage :: Config -> User -> BuildNum -> IO String
 createWebPage config u bn
  = do let urlRoot = config_urlRoot config
+          root = Server (baseDir </> "clients") u
           buildsDir = baseDir </> "clients" </> u </> "builds"
           buildDir = buildsDir </> show bn
           stepsDir = buildDir </> "steps"
-          webBuildDir = baseDir </> "web/builders" </> u </> show bn
+          webRootDir = baseDir </> "web/builders"
+          webBuilderDir = webRootDir </> u
+          webBuildDir = webBuilderDir </> show bn
       steps <- getSortedNumericDirectoryContents stepsDir
                `onDoesNotExist`
                return []
       createDirectory webBuildDir
-      mapM_ (mkStepPage u bn) steps
-      relPage <- mkBuildPage config u bn steps
-      mkIndex u
+      mapM_ (mkStepPage root u bn) steps
+      (relPage, result) <- mkBuildPage root config u bn steps
+      mkBuilderIndex root webBuilderDir u bn result
       return (urlRoot </> relPage)
 
-mkStepPage :: User -> BuildNum -> BuildStepNum -> IO ()
-mkStepPage u bn bsn
- = do let root = Server (baseDir </> "clients") u
-          page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
+mkStepPage :: Root -> User -> BuildNum -> BuildStepNum -> IO ()
+mkStepPage root u bn bsn
+ = do let page = baseDir </> "web/builders" </> u </> show bn </> show bsn <.> "html"
           maybeToHtmlWith _ Nothing  = (thespan ! [theclass "missing"])
                                            (stringToHtml "Missing")
           maybeToHtmlWith f (Just x) = stringToHtml (f x)
@@ -51,7 +53,7 @@ mkStepPage u bn bsn
       mec        <- readMaybeBuildStepExitcode  root bn bsn
       mStartTime <- readMaybeBuildStepStartTime root bn bsn
       mEndTime   <- readMaybeBuildStepEndTime   root bn bsn
-      outputHtml <- getOutputHtml              root bn bsn
+      outputHtml <- getOutputHtml               root bn bsn
       let descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
           html = header headerHtml
              +++ body bodyHtml
@@ -77,19 +79,15 @@ mkStepPage u bn bsn
           str = renderHtml html
       writeBinaryFile page str
 
-mkBuildPage :: Config -> User -> BuildNum -> [BuildStepNum] -> IO String
-mkBuildPage config u bn bsns
- = do let root = Server (baseDir </> "clients") u
-          relPage = "builders" </> u </> show bn <.> "html"
+mkBuildPage :: Root -> Config -> User -> BuildNum -> [BuildStepNum]
+            -> IO (String, Result)
+mkBuildPage root config u bn bsns
+ = do let relPage = "builders" </> u </> show bn <.> "html"
           page = baseDir </> "web" </> relPage
       links <- mapM (mkLink root bn) bsns
       result <- readBuildResult root bn
       outputs <- mapM (mkOutput root bn) bsns
-      let linkClass = case result of
-                      Success -> "success"
-                      Failure -> "failure"
-                      Incomplete -> "incomplete"
-          builderDescription = case lookup u (config_clients config) of
+      let builderDescription = case lookup u (config_clients config) of
                                Just ui -> " (" ++ ui_description ui ++ ")"
                                Nothing -> ""
           description = u ++ builderDescription ++ ", build " ++ show bn
@@ -98,7 +96,7 @@ mkBuildPage config u bn bsns
              +++ body bodyHtml
           bodyHtml = h1 descriptionHtml
                  +++ ulist (concatHtml (map li links))
-                 +++ (paragraph ! [theclass linkClass])
+                 +++ (paragraph ! [theclass (resultToLinkClass result)])
                          (stringToHtml $ show result)
                  +++ concatHtml outputs
           headerHtml = thetitle descriptionHtml
@@ -108,7 +106,7 @@ mkBuildPage config u bn bsns
                            noHtml
           str = renderHtml html
       writeBinaryFile page str
-      return relPage
+      return (relPage, result)
 
 mkLink :: Root -> BuildNum -> BuildStepNum -> IO Html
 mkLink root bn bsn
@@ -156,7 +154,55 @@ getOutputHtml root bn bsn
                                       (stringToHtml lineStr)
          return outputHtml
 
--- XXX This should do something:
-mkIndex :: User -> IO ()
-mkIndex _ = return ()
+data IndexData = IndexData {
+                     idNext :: BuildNum,
+                     idBuildResults :: [(BuildNum, Result)]
+                 }
+    deriving (Show, Read)
+
+mkBuilderIndex :: Root -> FilePath -> User -> BuildNum -> Result -> IO ()
+mkBuilderIndex root webBuilderDir u bn result
+ = do let indexPage = webBuilderDir </> "index.html"
+          indexDataFile = webBuilderDir </> "index.dat"
+      mIndexData <- maybeReadFromFile indexDataFile
+      buildResults <- case mIndexData of
+                      Just i
+                       | idNext i == bn -> return $ idBuildResults i
+                      _ ->
+                       do warn ("Failed to read " ++ show indexDataFile ++
+                                ". Recreating it.")
+                          bns <- getBuildNumbers root
+                          mapM (\bn' -> do res <- readBuildResult root bn'
+                                           return (bn', res))
+                               (reverse bns)
+      let buildResults' = (bn, result) : buildResults
+          indexData' = IndexData {
+                           idNext = bn + 1,
+                           idBuildResults = buildResults'
+                       }
+          html = mkBuilderIndexHtml u buildResults'
+      writeToFile indexDataFile indexData'
+      writeBinaryFile indexPage $ renderHtml html
+
+mkBuilderIndexHtml :: User -> [(BuildNum, Result)] -> Html
+mkBuilderIndexHtml u xs = header headerHtml
+                      +++ body bodyHtml
+    where headerHtml = thetitle descriptionHtml
+                   +++ (thelink ! [rel "Stylesheet",
+                                   thetype "text/css",
+                                   href "../../css/builder.css"])
+                           noHtml
+          bodyHtml = h1 descriptionHtml
+                 +++ ulist (concatHtml (map li links))
+          descriptionHtml = stringToHtml u
+          links = [ (anchor ! [href url, theclass (resultToLinkClass res)])
+                        (stringToHtml (show bn ++ ": " ++ show res))
+                  | (bn, res) <- xs
+                  , let url = show bn <.> "html"
+                  ]
+
+resultToLinkClass :: Result -> String
+resultToLinkClass Success = "success"
+resultToLinkClass Failure = "failure"
+resultToLinkClass Incomplete = "incomplete"
 
