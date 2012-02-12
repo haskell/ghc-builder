@@ -76,32 +76,33 @@ addClient client
     where isOKChar c = isAlphaNum c || c == '-' || c == '_'
 
 runServer :: Maybe FilePath -> Verbosity -> IO ()
-runServer mfp v = withSocketsDo $ withOpenSSL $
-    do messagerVar <- newEmptyMVar
-       notifierVar <- newEmptyMVar
-       configHandlerVar <- newEmptyMVar
-       timeMasterVar <- newEmptyMVar
-       let directory = Directory {
-                           dir_messagerVar = messagerVar,
-                           dir_notifierVar = notifierVar,
-                           dir_configHandlerVar = configHandlerVar,
-                           dir_timeMasterVar = timeMasterVar
-                       }
-           mfph = case mfp of
-                  Nothing -> Nothing
-                  Just fp -> Just (fp, Nothing)
-       persistentThread "Messager"       (messager directory mfph v)
-       persistentThread "Notification"   (notifier directory)
-       persistentThread "Config handler" (configHandler configHandlerVar)
-       persistentThread "Time"           (timeMaster timeMasterVar)
-       _ <- installHandler sigHUP
-                           (Catch (gotSigHUP directory))
-                           Nothing
-       addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
-       let serveraddr = head addrinfos
-       bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
-               sClose
-               (listenForClients directory serveraddr)
+runServer mfp v = withSocketsDo $ withOpenSSL $ do
+    tid <- myThreadId
+    messagerVar <- newEmptyMVar
+    notifierVar <- newEmptyMVar
+    configHandlerVar <- newEmptyMVar
+    timeMasterVar <- newEmptyMVar
+    let directory = Directory {
+                        dir_messagerVar = messagerVar,
+                        dir_notifierVar = notifierVar,
+                        dir_configHandlerVar = configHandlerVar,
+                        dir_timeMasterVar = timeMasterVar
+                    }
+        mfph = case mfp of
+               Nothing -> Nothing
+               Just fp -> Just (fp, Nothing)
+    runThread tid Persistent "Messager"       (messager directory mfph v)
+    runThread tid Persistent "Notification"   (notifier directory)
+    runThread tid Persistent "Config handler" (configHandler configHandlerVar)
+    runThread tid Persistent "Time"           (timeMaster timeMasterVar)
+    _ <- installHandler sigHUP
+                        (Catch (gotSigHUP directory))
+                        Nothing
+    addrinfos <- getAddrInfo Nothing (Just "0.0.0.0") (Just (show port))
+    let serveraddr = head addrinfos
+    bracket (socket (addrFamily serveraddr) Stream defaultProtocol)
+            sClose
+            (listenForClients tid directory serveraddr)
 
 gotSigHUP :: Directory -> IO ()
 gotSigHUP directory
@@ -109,26 +110,39 @@ gotSigHUP directory
       putMVar (dir_messagerVar directory) Reopen
       putMVar (dir_configHandlerVar directory) ReloadConfig
 
-persistentThread :: String -> IO () -> IO ()
-persistentThread title f
- = do let thread = f `catch` \e ->
-                       do warn (exceptionMsg e)
-                          thread
+data ThreadType = Persistent | ClientThread
+
+runThread :: ThreadId -> ThreadType -> String -> IO () -> IO ()
+runThread mainThread threadType title f
+ = do let thread = f
+                   `catches`
+                   [Handler $ \e ->
+                        do warn ("Got an asynchronous exception: " ++
+                                 show (e :: AsyncException))
+                           killThread mainThread,
+                    Handler $ \e ->
+                        case threadType of
+                            Persistent ->
+                                do warn (exceptionMsg e ["Restarting..."])
+                                   thread
+                            ClientThread ->
+                                warn (exceptionMsg e [])
+                   ]
       _ <- forkIO thread
       return ()
-    where exceptionMsg e = unlines [title ++ " thread got an exception:",
-                                    show (e :: SomeException),
-                                    "Restarting..."]
+    where exceptionMsg e ms = unlines ([title ++ " thread got an exception:",
+                                        show (e :: SomeException)] ++ ms)
 
-listenForClients :: Directory -> AddrInfo -> Socket -> IO ()
-listenForClients directory serveraddr sock
+listenForClients :: ThreadId -> Directory -> AddrInfo -> Socket -> IO ()
+listenForClients tid directory serveraddr sock
  = do bindSocket sock (addrAddress serveraddr)
       listen sock 1
       let defaultProtocolVersion = 0.1
           mainLoop = do (conn, addr) <- Network.Socket.accept sock
                         let who = Unauthed addr
                         verbose' directory who "Connection established"
-                        _ <- forkIO $ startSsl defaultProtocolVersion directory who conn
+                        _ <- runThread tid ClientThread (show addr) $
+                             startSsl defaultProtocolVersion directory who conn
                         mainLoop
       mainLoop
 
