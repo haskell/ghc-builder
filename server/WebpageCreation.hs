@@ -19,8 +19,9 @@ import Text.XHtml.Strict
 createWebPage :: Config -> User -> BuildNum -> IO String
 createWebPage config u bn
  = do let urlRoot = config_urlRoot config
-          root = Server (baseDir </> "clients") u
-          buildsDir = baseDir </> "clients" </> u </> "builds"
+          usersDir = baseDir </> "clients"
+          root = Server usersDir u
+          buildsDir = usersDir </> u </> "builds"
           buildDir = buildsDir </> show bn
           stepsDir = buildDir </> "steps"
           webRootDir = baseDir </> "web/builders"
@@ -33,6 +34,7 @@ createWebPage config u bn
       mapM_ (mkStepPage root u bn) steps
       (relPage, result) <- mkBuildPage root config u bn steps
       mkBuilderIndex root webBuilderDir u bn result
+      mkIndex usersDir webRootDir u bn result
       return (urlRoot </> relPage)
 
 mkStepPage :: Root -> User -> BuildNum -> BuildStepNum -> IO ()
@@ -200,6 +202,74 @@ mkBuilderIndexHtml u xs = header headerHtml
                   | (bn, res) <- xs
                   , let url = show bn <.> "html"
                   ]
+
+data IndexData = IndexData {
+                     idRecentResults :: [(User, [(BuildNum, Result)])]
+                 }
+    deriving (Show, Read)
+
+-- The indexWidth is how many previous builds we show the result of in
+-- the main index
+indexWidth :: Int
+indexWidth = 10
+
+mkIndex :: FilePath -> FilePath -> User -> BuildNum -> Result -> IO ()
+mkIndex usersDir webDir u bn result
+ = do let indexPage = webDir </> "index.html"
+          indexDataFile = webDir </> "index.dat"
+      mIndexData <- maybeReadFromFile indexDataFile
+      indexData <- case mIndexData of
+                   Just i -> return $ idRecentResults i
+                   _ ->
+                       do warn ("Failed to read " ++ show indexDataFile
+                             ++ ". Recreating it.")
+                          regenerateIndexData usersDir
+      let (myIndexData, othersIndexData) = partition ((u ==) . fst) indexData
+          myIndexDatum = case myIndexData of
+                         [] -> []
+                         ((_, x) : _) -> x
+                         -- If the list has > 1 element then something's
+                         -- gone wrong, but let's not worry about that
+          indexData' = (u, take indexWidth ((bn, result) : myIndexDatum))
+                     : othersIndexData
+          html = mkIndexHtml indexData'
+      writeToFile indexDataFile indexData'
+      writeBinaryFile indexPage $ renderHtml html
+
+regenerateIndexData :: FilePath -> IO [(User, [(BuildNum, Result)])]
+regenerateIndexData usersDir
+    = do let doUser user = do let root = Server usersDir user
+                              bns <- getBuildNumbers root
+                              let bns' = take indexWidth (reverse bns)
+                              xs <- mapM (doBuild root) bns'
+                              return (user, xs)
+             doBuild root bn = do res <- readBuildResult root bn
+                                  return (bn, res)
+         users <- getInterestingDirectoryContents usersDir
+         mapM doUser users
+
+mkIndexHtml :: [(User, [(BuildNum, Result)])] -> Html
+mkIndexHtml xs = header headerHtml
+             +++ body bodyHtml
+    where headerHtml = thetitle descriptionHtml
+                   +++ (thelink ! [rel "Stylesheet",
+                                   thetype "text/css",
+                                   href "../css/builder.css"])
+                           noHtml
+          bodyHtml = h1 descriptionHtml
+                 +++ (table ! [border 1])
+                         (concatHtml builderTable)
+          descriptionHtml = stringToHtml "Builder summary"
+          builderTable = [ tr (td uLink +++ mkCells u bnresults)
+                         | (u, bnresults) <- xs
+                         , let uLink = (anchor ! [href (u </> "index.html")])
+                                           (stringToHtml u)
+                         ]
+          mkCells u bnresults = [ td (mkCell u bn result)
+                                | (bn, result) <- bnresults ]
+          mkCell u bn res = (anchor ! [href (u </> show bn <.> "html"),
+                                       theclass (resultToLinkClass res)])
+                                (stringToHtml (show bn ++ ": " ++ show res))
 
 resultToLinkClass :: Result -> String
 resultToLinkClass Success = "success"

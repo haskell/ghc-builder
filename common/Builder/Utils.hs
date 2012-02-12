@@ -14,6 +14,7 @@ module Builder.Utils (
               getMaybeSizedThing, putMaybeSizedThing, putMaybeGivenSizedThing,
               readSizedThing, sendSizedThing,
               getSortedNumericDirectoryContents,
+              getInterestingDirectoryContents,
               withCurrentDirectory,
               onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
               onConnectionDropped, onConnectionFailed,
@@ -252,14 +253,25 @@ getSortedNumericDirectoryContents fp
 
 getNumericDirectoryContents :: FilePath -> IO [Integer]
 getNumericDirectoryContents fp
+ = do xs <- getInterestingDirectoryContents fp
+      f xs
+    where f [] = return []
+          f (x : xs) = case maybeRead x of
+                       Nothing ->
+                           die ("Bad directory entry: " ++ show x)
+                       Just n ->
+                           liftM (n :) (f xs)
+
+getInterestingDirectoryContents :: FilePath -> IO [FilePath]
+getInterestingDirectoryContents fp
  = do xs <- getDirectoryContents fp
             -- Thorkil says that the tn23 builder sometimes gets an
             -- invalid argument exception (happened Oct 31 and Dec 04).
             -- I don't know what's going on, but in the interests of
             -- making something work, we treat that as no contents.
             `catchInvalidArgument` \e ->
-                do warn "Got an InvalidArgument exception in getNumericDirectoryContents"
-                   warn ("Requested numeric directory contents for " ++ show fp)
+                do warn "Got an InvalidArgument exception in getInterestingDirectoryContents"
+                   warn ("Requested directory contents for " ++ show fp)
                    warn "Exception was:"
                    mapM_ warn $ map ("    " ++) $ lines $ show e
                    curDir <- getCurrentDirectory
@@ -271,15 +283,7 @@ getNumericDirectoryContents fp
                                 return []
                    warn ("Second result: " ++ show xs)
                    return []
-      f xs
-    where f [] = return []
-          f ("." : xs) = f xs
-          f (".." : xs) = f xs
-          f (x : xs) = case maybeRead x of
-                       Nothing ->
-                           die ("Bad directory entry: " ++ show x)
-                       Just n ->
-                           liftM (n :) (f xs)
+      return $ filter (`notElem` [".", ".."]) xs
 
 withCurrentDirectory :: FilePath -> IO a -> IO a
 withCurrentDirectory dir io = do curDir <- getCurrentDirectory
