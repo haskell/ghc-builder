@@ -19,7 +19,9 @@ Library
                      Builder.Files
                      Builder.Handlelike
                      Builder.Utils
-    Extensions: DeriveDataTypeable, GeneralizedNewtypeDeriving
+    Extensions: ScopedTypeVariables,
+                DeriveDataTypeable,
+                GeneralizedNewtypeDeriving
     Ghc-Options: -Wall
     Build-Depends: base        >= 4   && < 5,
                    bytestring  >= 0.9 && < 0.10,

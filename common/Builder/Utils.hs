@@ -33,6 +33,7 @@ import Data.Fixed
 import Data.List
 import Data.Time.LocalTime
 import GHC.IO.Exception (IOErrorType(TimeExpired, InvalidArgument))
+import OpenSSL.Session (SomeSSLException)
 import Prelude hiding (catch)
 import System.Directory
 import System.Exit
@@ -313,11 +314,11 @@ onEndOfFile io io' = io `catch` \e -> if isEOFError e
 
 onConnectionDropped :: IO a -> IO a -> IO a
 onConnectionDropped io io'
- = io `catch` \e ->
-   if isEOFError e ||
-      (isUserError e && ("SSL" `isPrefixOf` ioeGetErrorString e))
-   then io'
-   else throwIO e
+ = io `catches`
+   [Handler $ \e -> if isEOFError e
+                    then io'
+                    else throwIO e,
+    Handler $ \(_ :: SomeSSLException) -> io']
 
 data Instructions = Idle
                   | StartBuild BuildTime
