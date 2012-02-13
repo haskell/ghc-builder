@@ -265,11 +265,11 @@ mkIndexHtml xs = header headerHtml
                          , let uLink = (anchor ! [href (u </> "index.html")])
                                            (stringToHtml u)
                          ]
-          mkCells u bnresults = [ td (mkCell u bn result)
+          mkCells u bnresults = [ mkCell u bn result
                                 | (bn, result) <- bnresults ]
-          mkCell u bn res = (anchor ! [href (u </> show bn <.> "html"),
-                                       theclass (resultToLinkClass res)])
-                                (stringToHtml (show bn ++ ": " ++ show res))
+          mkCell u bn res = (td ! [theclass (resultToLinkClass res)])
+                          $ (anchor ! [href (u </> show bn <.> "html")])
+                          $ stringToHtml (show bn ++ ": " ++ show res)
 
 resultToLinkClass :: Result -> String
 resultToLinkClass Success = "success"
