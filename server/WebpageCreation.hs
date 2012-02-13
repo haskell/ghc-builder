@@ -219,21 +219,22 @@ mkIndex usersDir webDir u bn result
           indexDataFile = webDir </> "index.dat"
       mIndexData <- maybeReadFromFile indexDataFile
       indexData <- case mIndexData of
-                   Just i -> return $ idRecentResults i
+                   Just (IndexData i) ->
+                       do let (mine, others) = partition ((u ==) . fst) i
+                              myOne = case mine of
+                                      [] -> []
+                                      ((_, x) : _) -> x
+                                      -- If the list has > 1 element
+                                      -- then something's gone wrong,
+                                      -- but let's not worry about that
+                              myOne' = take indexWidth ((bn, result) : myOne)
+                          return ((u, myOne') : others)
                    _ ->
                        do warn ("Failed to read " ++ show indexDataFile
                              ++ ". Recreating it.")
                           regenerateIndexData usersDir
-      let (myIndexData, othersIndexData) = partition ((u ==) . fst) indexData
-          myIndexDatum = case myIndexData of
-                         [] -> []
-                         ((_, x) : _) -> x
-                         -- If the list has > 1 element then something's
-                         -- gone wrong, but let's not worry about that
-          indexData' = (u, take indexWidth ((bn, result) : myIndexDatum))
-                     : othersIndexData
-          html = mkIndexHtml indexData'
-      writeToFile indexDataFile indexData'
+      let html = mkIndexHtml indexData
+      writeToFile indexDataFile (IndexData indexData)
       writeBinaryFile indexPage $ renderHtml html
 
 regenerateIndexData :: FilePath -> IO [(User, [(BuildNum, Result)])]
