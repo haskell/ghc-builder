@@ -260,10 +260,15 @@ mkIndexHtml xs = header headerHtml
                  +++ (table ! [border 1])
                          (concatHtml builderTable)
           descriptionHtml = stringToHtml "Builder summary"
-          builderTable = [ tr (td uLink +++ mkCells u bnresults)
+          builderTable = [ tr ((td ! [theclass lastResultClass]) uLink +++
+                               mkCells u bnresults)
                          | (u, bnresults) <- xs
                          , let uLink = (anchor ! [href (u </> "index.html")])
                                            (stringToHtml u)
+                               lastResult = case bnresults of
+                                            [] -> Incomplete
+                                            (_, res) : _ -> res
+                               lastResultClass = resultToLinkClass lastResult
                          ]
           mkCells u bnresults = [ mkCell u bn result
                                 | (bn, result) <- bnresults ]
