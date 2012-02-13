@@ -20,11 +20,8 @@ sendEmails :: Config -> User -> BuildNum -> String -> IO ()
 sendEmails config u bn url
  = do let fromAddress = config_fromAddress config
           emailAddresses = config_emailAddresses config
-          buildsDir = baseDir </> "clients" </> u </> "builds"
-          buildDir = buildsDir </> show bn
-          stepsDir = buildDir </> "steps"
           root = Server (baseDir </> "clients") u
-      bsns <- getSortedNumericDirectoryContents stepsDir
+      bsns <- getBuildStepNumbers root bn
               `onDoesNotExist`
               return []
       steps <- mapM (mkStep root bn) bsns

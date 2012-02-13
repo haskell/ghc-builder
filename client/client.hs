@@ -299,8 +299,8 @@ runBuildStep bn (bsn, bs)
 uploadAllBuildResults :: ClientMonad ()
 uploadAllBuildResults
  = do baseDir <- getBaseDir
-      let buildsDir = baseDir </> "builds"
-      bns <- liftIO $ getSortedNumericDirectoryContents buildsDir
+      let root = Client baseDir
+      bns <- liftIO $ getBuildNumbers root
       unless (null bns) $
           do sendServer "LAST UPLOADED"
              getTheResponseCode respSizedThingFollows
@@ -353,7 +353,7 @@ uploadBuildResults bn
                    removeBuildStepExitcode   root bn bsn
                    removeBuildStepOutput     root bn bsn
                    liftIO $ removeDirectory stepDir
-      bsns <- liftIO $ getSortedNumericDirectoryContents stepsDir
+      bsns <- liftIO $ getBuildStepNumbers root bn
       mapM_ sendStep bsns
       liftIO $ removeDirectory stepsDir
       sendServer ("RESULT " ++ show bn)
