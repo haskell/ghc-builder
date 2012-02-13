@@ -21,20 +21,18 @@ createWebPage config u bn
  = do let urlRoot = config_urlRoot config
           usersDir = baseDir </> "clients"
           root = Server usersDir u
-          buildsDir = usersDir </> u </> "builds"
-          buildDir = buildsDir </> show bn
-          stepsDir = buildDir </> "steps"
           webRootDir = baseDir </> "web/builders"
           webBuilderDir = webRootDir </> u
           webBuildDir = webBuilderDir </> show bn
-      steps <- getSortedNumericDirectoryContents stepsDir
+      steps <- getBuildStepNumbers root bn
                `onDoesNotExist`
                return []
       createDirectory webBuildDir
       mapM_ (mkStepPage root u bn) steps
       (relPage, result) <- mkBuildPage root config u bn steps
-      mkBuilderIndex root webBuilderDir u bn result
-      mkIndex usersDir webRootDir u bn result
+      mEndTime <- getEndTime' root bn steps
+      mkBuilderIndex root webBuilderDir u bn mEndTime result
+      mkIndex usersDir webRootDir u bn mEndTime result
       return (urlRoot </> relPage)
 
 mkStepPage :: Root -> User -> BuildNum -> BuildStepNum -> IO ()
@@ -46,8 +44,7 @@ mkStepPage root u bn bsn
           maybeToHtml = maybeToHtmlWith id
           maybeToShowHtml :: Show a => Maybe a -> Html
           maybeToShowHtml = maybeToHtmlWith show
-          maybeToTimeHtml = maybeToHtmlWith
-                                (show . posixSecondsToUTCTime . fromInteger)
+          maybeToTimeHtml = maybeToHtmlWith endTimeToString
       mstepName  <- readMaybeBuildStepName      root bn bsn
       msubdir    <- readMaybeBuildStepSubdir    root bn bsn
       mprog      <- readMaybeBuildStepProg      root bn bsn
@@ -156,27 +153,31 @@ getOutputHtml root bn bsn
                                       (stringToHtml lineStr)
          return outputHtml
 
-data BuilderIndexData = BuilderIndexData {
-                            bidNext :: BuildNum,
-                            bidBuildResults :: [(BuildNum, Result)]
-                        }
+data BuilderIndexData
+         = BuilderIndexData {
+               bidNext :: BuildNum,
+               bidBuildResults :: [(BuildNum, Maybe EndTime, Result)]
+           }
     deriving (Show, Read)
 
-mkBuilderIndex :: Root -> FilePath -> User -> BuildNum -> Result -> IO ()
-mkBuilderIndex root webBuilderDir u bn result
+mkBuilderIndex :: Root -> FilePath -> User -> BuildNum
+               -> Maybe EndTime -> Result
+               -> IO ()
+mkBuilderIndex root webBuilderDir u bn mEndTime result
  = do let builderIndexPage = webBuilderDir </> "index.html"
           builderIndexDataFile = webBuilderDir </> "index.dat"
       mBuilderIndexData <- maybeReadFromFile builderIndexDataFile
       buildResults <- case mBuilderIndexData of
                       Just i
                        | bidNext i == bn ->
-                          return ((bn, result) : bidBuildResults i)
+                          return ((bn, mEndTime, result) : bidBuildResults i)
                       _ ->
                        do warn ("Failed to read " ++ show builderIndexDataFile
                              ++ ". Recreating it.")
                           bns <- getBuildNumbers root
                           mapM (\bn' -> do res <- readBuildResult root bn'
-                                           return (bn', res))
+                                           met <- getEndTime root bn'
+                                           return (bn', met, res))
                                (reverse bns)
       let builderIndexData' = BuilderIndexData {
                                   bidNext = bn + 1,
@@ -186,7 +187,7 @@ mkBuilderIndex root webBuilderDir u bn result
       writeToFile builderIndexDataFile builderIndexData'
       writeBinaryFile builderIndexPage $ renderHtml html
 
-mkBuilderIndexHtml :: User -> [(BuildNum, Result)] -> Html
+mkBuilderIndexHtml :: User -> [(BuildNum, Maybe EndTime, Result)] -> Html
 mkBuilderIndexHtml u xs = header headerHtml
                       +++ body bodyHtml
     where headerHtml = thetitle descriptionHtml
@@ -197,14 +198,17 @@ mkBuilderIndexHtml u xs = header headerHtml
           bodyHtml = h1 descriptionHtml
                  +++ ulist (concatHtml (map li links))
           descriptionHtml = stringToHtml u
-          links = [ (anchor ! [href url, theclass (resultToLinkClass res)])
-                        (stringToHtml (show bn ++ ": " ++ show res))
-                  | (bn, res) <- xs
+          links = [ (anchor ! [href url, theclass ("nonwrapped " ++ resultToLinkClass res)])
+                        text
+                  | (bn, met, res) <- xs
                   , let url = show bn <.> "html"
+                        text = stringToHtml (show bn ++ ": " ++ show res)
+                           +++ br
+                           +++ mEndTimeToString met
                   ]
 
 data IndexData = IndexData {
-                     idRecentResults :: [(User, [(BuildNum, Result)])]
+                     idRecentResults :: [(User, [(BuildNum, Maybe EndTime, Result)])]
                  }
     deriving (Show, Read)
 
@@ -213,8 +217,9 @@ data IndexData = IndexData {
 indexWidth :: Int
 indexWidth = 10
 
-mkIndex :: FilePath -> FilePath -> User -> BuildNum -> Result -> IO ()
-mkIndex usersDir webDir u bn result
+mkIndex :: FilePath -> FilePath -> User -> BuildNum -> Maybe EndTime -> Result
+        -> IO ()
+mkIndex usersDir webDir u bn mEndTime result
  = do let indexPage = webDir </> "index.html"
           indexDataFile = webDir </> "index.dat"
       mIndexData <- maybeReadFromFile indexDataFile
@@ -227,7 +232,7 @@ mkIndex usersDir webDir u bn result
                                       -- If the list has > 1 element
                                       -- then something's gone wrong,
                                       -- but let's not worry about that
-                              myOne' = take indexWidth ((bn, result) : myOne)
+                              myOne' = take indexWidth ((bn, mEndTime, result) : myOne)
                           return ((u, myOne') : others)
                    _ ->
                        do warn ("Failed to read " ++ show indexDataFile
@@ -237,7 +242,8 @@ mkIndex usersDir webDir u bn result
       writeToFile indexDataFile (IndexData indexData)
       writeBinaryFile indexPage $ renderHtml html
 
-regenerateIndexData :: FilePath -> IO [(User, [(BuildNum, Result)])]
+regenerateIndexData :: FilePath
+                    -> IO [(User, [(BuildNum, Maybe EndTime, Result)])]
 regenerateIndexData usersDir
     = do let doUser user = do let root = Server usersDir user
                               bns <- getBuildNumbers root
@@ -245,11 +251,12 @@ regenerateIndexData usersDir
                               xs <- mapM (doBuild root) bns'
                               return (user, xs)
              doBuild root bn = do res <- readBuildResult root bn
-                                  return (bn, res)
+                                  met <- getEndTime root bn
+                                  return (bn, met, res)
          users <- getInterestingDirectoryContents usersDir
          mapM doUser users
 
-mkIndexHtml :: [(User, [(BuildNum, Result)])] -> Html
+mkIndexHtml :: [(User, [(BuildNum, Maybe EndTime, Result)])] -> Html
 mkIndexHtml xs = header headerHtml
              +++ body bodyHtml
     where headerHtml = thetitle descriptionHtml
@@ -262,23 +269,47 @@ mkIndexHtml xs = header headerHtml
                          (concatHtml builderTable)
           descriptionHtml = stringToHtml "Builder summary"
           builderTable = [ tr ((td ! [theclass lastResultClass]) uLink +++
-                               mkCells u bnresults)
-                         | (u, bnresults) <- xs
+                               mkCells u ys)
+                         | (u, ys) <- xs
                          , let uLink = (anchor ! [href (u </> "index.html")])
                                            (stringToHtml u)
-                               lastResult = case bnresults of
+                               lastResult = case ys of
                                             [] -> Incomplete
-                                            (_, res) : _ -> res
+                                            (_, _, res) : _ -> res
                                lastResultClass = resultToLinkClass lastResult
                          ]
-          mkCells u bnresults = [ mkCell u bn result
-                                | (bn, result) <- bnresults ]
-          mkCell u bn res = (td ! [theclass (resultToLinkClass res)])
-                          $ (anchor ! [href (u </> show bn <.> "html")])
-                          $ stringToHtml (show bn ++ ": " ++ show res)
+          mkCells u bnresults = [ mkCell u bn met result
+                                | (bn, met, result) <- bnresults ]
+          mkCell u bn met res
+              = (td ! [theclass ("nonwrapped " ++ resultToLinkClass res)])
+              $ (anchor ! [href (u </> show bn <.> "html")])
+                    (stringToHtml (show bn ++ ": " ++ show res)
+                 +++ br
+                 +++ stringToHtml (mEndTimeToString met))
+
+getEndTime :: Root -> BuildNum -> IO (Maybe EndTime)
+getEndTime root bn = do steps <- getBuildStepNumbers root bn
+                                 `onDoesNotExist`
+                                 return []
+                        getEndTime' root bn steps
+
+getEndTime' :: Root -> BuildNum -> [BuildStepNum] -> IO (Maybe EndTime)
+getEndTime' root bn steps = f (reverse steps)
+    where f [] = return Nothing
+          f (s : ss) = do met <- readMaybeBuildStepEndTime root bn s
+                          case met of
+                              Just et -> return (Just et)
+                              Nothing -> f ss
 
 resultToLinkClass :: Result -> String
 resultToLinkClass Success = "success"
 resultToLinkClass Failure = "failure"
 resultToLinkClass Incomplete = "incomplete"
+
+mEndTimeToString :: Maybe EndTime -> String
+mEndTimeToString Nothing = "<unknown>"
+mEndTimeToString (Just et) = endTimeToString et
+
+endTimeToString :: EndTime -> String
+endTimeToString = show . posixSecondsToUTCTime . fromInteger
 

@@ -2,7 +2,7 @@
 module Builder.Files (
  Root(..),
  --
- getBuildNumbers,
+ getBuildNumbers, getBuildStepNumbers,
  --
  removeBuildStepName,
  getMaybeBuildStepName,         putMaybeBuildStepName,
@@ -72,6 +72,9 @@ dirBuildStep bn bsn = "builds" </> show bn </> "steps" </> show bsn
 
 getBuildNumbers :: Root -> IO [BuildNum]
 getBuildNumbers root = getSortedNumericDirectoryContents (mkPath root "builds")
+
+getBuildStepNumbers :: Root -> BuildNum -> IO [BuildStepNum]
+getBuildStepNumbers root bn = getSortedNumericDirectoryContents (mkPath root ("builds" </> show bn </> "steps"))
 
 --
 
