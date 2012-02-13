@@ -169,7 +169,8 @@ mkBuilderIndex root webBuilderDir u bn result
       mBuilderIndexData <- maybeReadFromFile builderIndexDataFile
       buildResults <- case mBuilderIndexData of
                       Just i
-                       | bidNext i == bn -> return $ bidBuildResults i
+                       | bidNext i == bn ->
+                          return ((bn, result) : bidBuildResults i)
                       _ ->
                        do warn ("Failed to read " ++ show builderIndexDataFile
                              ++ ". Recreating it.")
@@ -177,12 +178,11 @@ mkBuilderIndex root webBuilderDir u bn result
                           mapM (\bn' -> do res <- readBuildResult root bn'
                                            return (bn', res))
                                (reverse bns)
-      let buildResults' = (bn, result) : buildResults
-          builderIndexData' = BuilderIndexData {
+      let builderIndexData' = BuilderIndexData {
                                   bidNext = bn + 1,
-                                  bidBuildResults = buildResults'
+                                  bidBuildResults = buildResults
                               }
-          html = mkBuilderIndexHtml u buildResults'
+          html = mkBuilderIndexHtml u buildResults
       writeToFile builderIndexDataFile builderIndexData'
       writeBinaryFile builderIndexPage $ renderHtml html
 
