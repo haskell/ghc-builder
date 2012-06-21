@@ -51,7 +51,9 @@ module Builder.Files (
 
 import Builder.Utils
 
+import Control.Monad
 import Control.Monad.Trans
+import Data.Maybe
 import System.Directory
 import System.Exit
 import System.FilePath
@@ -381,8 +383,12 @@ putMaybeBuildResult :: MonadIO m => Root -> BuildNum -> Maybe String -> m ()
 putMaybeBuildResult root bn m
  = maybeWriteBinaryFile (fpBuildResult root bn) m
 
+readMaybeBuildResult :: MonadIO m => Root -> BuildNum -> m (Maybe Result)
+readMaybeBuildResult root bn = maybeReadFromFile $ fpBuildResult root bn
+
 readBuildResult :: MonadIO m => Root -> BuildNum -> m Result
-readBuildResult root bn = readFromFile $ fpBuildResult root bn
+readBuildResult root bn
+ = liftM (fromMaybe Incomplete) $ readMaybeBuildResult root bn
 
 writeBuildResult :: MonadIO m => Root -> BuildNum -> Result -> m ()
 writeBuildResult root bn result
