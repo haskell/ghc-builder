@@ -21,8 +21,7 @@ messager directory m v
                      Just (_, Just h) ->
                          hPutStrLn h str
                      _ ->
-                         return ()
-                 when (v >= v') $ putStrLn str
+                         when (v >= v') $ putStrLn str
                  messager directory m v
           Reopen ->
               do case m of

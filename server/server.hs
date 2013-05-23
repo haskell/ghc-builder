@@ -34,6 +34,7 @@ import System.Environment
 import System.FilePath
 import System.IO
 import System.Locale
+import System.Posix.Process
 import System.Posix.Signals
 
 main :: IO ()
@@ -41,10 +42,11 @@ main = do hSetBuffering stdout LineBuffering
           hSetBuffering stderr LineBuffering
           args <- getArgs
           case args of
-              []              -> runServer Nothing  Normal
-              ["-v"]          -> runServer Nothing  Verbose
-              ["-o", o]       -> runServer (Just o) Normal
-              ["-v", "-o", o] -> runServer (Just o) Verbose
+              []              -> runServer Nothing              Normal
+              ["-v"]          -> runDaemon (Just "builder.log") Verbose
+              ["-d", "-v"]    -> runServer Nothing              Verbose
+              ["-o", o]       -> runServer (Just o)             Normal
+              ["-v", "-o", o] -> runServer (Just o)             Verbose
               ["init"]        -> initServer
               ["add", client] -> addClient client
               _               -> die "Bad args"
@@ -74,6 +76,18 @@ addClient client
                   createDirectory (baseDir </> "web/builders" </> client)
                   putStrLn "OK, client added"
     where isOKChar c = isAlphaNum c || c == '-' || c == '_'
+
+runDaemon :: Maybe FilePath -> Verbosity -> IO ()
+runDaemon mfp v
+    = do _ <- forkProcess $ do
+                  _ <- createSession
+                  _ <- forkProcess $ do
+                           hClose stdin
+                           hClose stdout
+                           hClose stderr
+                           runServer mfp v
+                  return ()
+         return ()
 
 runServer :: Maybe FilePath -> Verbosity -> IO ()
 runServer mfp v = withSocketsDo $ withOpenSSL $ do
@@ -144,6 +158,7 @@ listenForClients tid directory serveraddr sock
                         _ <- runThread tid ClientThread (show addr) $
                              startSsl defaultProtocolVersion directory who conn
                         mainLoop
+      verbose' directory Main "Server listening"
       mainLoop
 
 fpServerPem :: FilePath
