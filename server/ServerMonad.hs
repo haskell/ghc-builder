@@ -13,8 +13,10 @@ module ServerMonad (
                     getConfig,
                     NVar,
                     CHVar, ConfigHandlerRequest(..),
-                    TimeMasterVar,
+                    TimeMasterVar, getLocalTimeInTz,
                     baseDir,
+                    Ppr(..), Who(..), ClientThread(..), CoreThread(..),
+                    verbose, verbose', warn',
                    ) where
 
 import Builder.Config
@@ -23,7 +25,10 @@ import Builder.Utils
 
 import Control.Concurrent.MVar
 import Control.Monad.State
+import Data.Time.Format
 import Data.Time.LocalTime
+import Network.Socket
+import System.Locale
 
 type NVar = MVar (User, BuildNum)
 
@@ -122,5 +127,63 @@ getConfig :: Directory -> IO Config
 getConfig directory
  = do mv <- newEmptyMVar
       putMVar (dir_configHandlerVar directory) (GiveMeConfig mv)
+      takeMVar mv
+
+verbose :: String -> ServerMonad ()
+verbose str = do directory <- getDirectory
+                 u <- getUser
+                 liftIO $ verbose' directory (ClientThread (User u)) str
+
+verbose' :: Directory -> Who -> String -> IO ()
+verbose' directory who str = message' directory Verbose who str
+
+warn' :: Directory -> Who -> String -> IO ()
+warn' directory who str = message' directory Normal who ("Warning: " ++ str)
+
+message' :: Directory -> Verbosity -> Who -> String -> IO ()
+message' directory verbosity who str
+ = do lt <- getLocalTimeInTz directory "UTC"
+      let fmt = "[%Y-%m-%d %H:%M:%S]"
+          t = formatTime defaultTimeLocale fmt lt
+      putMVar (dir_messagerVar directory)
+              (Message verbosity $ unwords [t, ppr who, str])
+
+data Who = ClientThread ClientThread
+         | CoreThread CoreThread
+         | AddrThread SockAddr
+data ClientThread = User User
+                  | Unauthed SockAddr
+data CoreThread = MessagerThread
+                | NotifierThread
+                | ConfigThread
+                | TimeThread
+                | MainThread
+
+class Ppr a where
+    ppr :: a -> String
+
+instance Ppr Who where
+    ppr (ClientThread ct) = "["      ++ ppr ct ++ "]"
+    ppr (CoreThread   ct) = "[core:" ++ ppr ct ++ "]"
+    ppr (AddrThread   sa) = "[addr:" ++ ppr sa ++ "]"
+
+instance Ppr ClientThread where
+    ppr (User u)     = "U:" ++ u
+    ppr (Unauthed a) = "unauthed:" ++ ppr a
+
+instance Ppr CoreThread where
+    ppr MessagerThread = "Messager"
+    ppr NotifierThread = "Notifier"
+    ppr ConfigThread   = "Config handler"
+    ppr TimeThread     = "Time"
+    ppr MainThread     = "Main"
+
+instance Ppr SockAddr where
+    ppr = show
+
+getLocalTimeInTz :: Directory -> String -> IO LocalTime
+getLocalTimeInTz directory tz
+ = do mv <- newEmptyMVar
+      putMVar (dir_timeMasterVar directory) (tz, mv)
       takeMVar mv
 

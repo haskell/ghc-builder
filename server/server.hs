@@ -1,4 +1,6 @@
 
+{-# LANGUAGE RankNTypes #-}
+
 module Main where
 
 import qualified BuildSteps_0_1 as BS_0_1
@@ -104,10 +106,11 @@ runServer mfp v = withSocketsDo $ withOpenSSL $ do
         mfph = case mfp of
                Nothing -> Nothing
                Just fp -> Just (fp, Nothing)
-    runThread tid Persistent "Messager"       (messager directory mfph v)
-    runThread tid Persistent "Notification"   (notifier directory)
-    runThread tid Persistent "Config handler" (configHandler configHandlerVar)
-    runThread tid Persistent "Time"           (timeMaster timeMasterVar)
+        mkThread t = runThread directory tid (CoreThread t)
+    mkThread MessagerThread (messager directory mfph v)
+    mkThread NotifierThread (notifier directory)
+    mkThread ConfigThread   (configHandler directory configHandlerVar)
+    mkThread TimeThread     (timeMaster timeMasterVar)
     _ <- installHandler sigHUP
                         (Catch (gotSigHUP directory))
                         Nothing
@@ -119,32 +122,72 @@ runServer mfp v = withSocketsDo $ withOpenSSL $ do
 
 gotSigHUP :: Directory -> IO ()
 gotSigHUP directory
- = do verbose' directory Main "Reloading config"
+ = do verbose' directory (CoreThread MainThread) "Reloading config"
       putMVar (dir_messagerVar directory) Reopen
       putMVar (dir_configHandlerVar directory) ReloadConfig
 
-data ThreadType = Persistent | ClientThread
-
-runThread :: ThreadId -> ThreadType -> String -> IO () -> IO ()
-runThread mainThread threadType title f
- = do let thread = f
-                   `catches`
-                   [Handler $ \e ->
-                        do warn ("Got an asynchronous exception: " ++
-                                 show (e :: AsyncException))
-                           killThread mainThread,
-                    Handler $ \e ->
-                        case threadType of
-                            Persistent ->
-                                do warn (exceptionMsg e ["Restarting..."])
-                                   thread
-                            ClientThread ->
-                                warn (exceptionMsg e [])
-                   ]
-      _ <- forkIO thread
+runThread :: Directory -> ThreadId -> Who -> IO () -> IO ()
+runThread directory mainThread who f
+ = do let thread :: (forall a . IO a -> IO a) -> IO ()
+          thread unmask = do restart <- do unmask f
+                                           return False
+                                        `catches` [Handler asyncHandler,
+                                                   Handler anyHandler]
+                             when restart $ thread unmask
+      _ <- forkIOWithUnmask thread
       return ()
-    where exceptionMsg e ms = unlines ([title ++ " thread got an exception:",
-                                        show (e :: SomeException)] ++ ms)
+    where warn = warn' directory who
+          exceptionMsg e ms
+           = unlines ([ppr who ++ " thread got an exception:", show e] ++ ms)
+          asyncHandler :: AsyncException -> IO Bool
+          asyncHandler e = do
+              case who of
+                  CoreThread MessagerThread ->
+                      -- Can't easily write a message if it was the
+                      -- messager thread that got the async exception,
+                      -- but it isn't too important so we just don't
+                      -- bother
+                      return ()
+                  _ ->
+                      do warn ("Got an asynchronous exception: " ++
+                               show (e :: AsyncException))
+                         -- We want the above to get printed, but we are
+                         -- about to terminate the program, so we need
+                         -- to wait until the message thread has printed
+                         -- it.
+
+                         -- If we can put a second message, then the
+                         -- messager must have picked up the first
+                         -- one...
+                         warn "Throwing to main"
+                         -- ...and if we can put a third message, then
+                         -- it must have printed the first and picked up
+                         -- the second...
+                         warn "Bye"
+                         -- ...so now the first at least must have been
+                         -- printed.
+              throwTo mainThread e
+              return False
+
+          anyHandler :: SomeException -> IO Bool
+          anyHandler e =
+              case who of
+                  CoreThread ct ->
+                      do case ct of
+                             MessagerThread ->
+                                 -- If the messager thread died then we
+                                 -- can't print a message saying what
+                                 -- happened very easily. The messager
+                                 -- will print a message when it
+                                 -- restarts at least, so it's not too
+                                 -- important.
+                                 return ()
+                             _ ->
+                                 warn (exceptionMsg e ["Restarting..."])
+                         return True
+                  _ ->
+                      do warn (exceptionMsg e [])
+                         return False
 
 listenForClients :: ThreadId -> Directory -> AddrInfo -> Socket -> IO ()
 listenForClients tid directory serveraddr sock
@@ -152,12 +195,12 @@ listenForClients tid directory serveraddr sock
       listen sock 1
       let defaultProtocolVersion = 0.1
           mainLoop = do (conn, addr) <- Network.Socket.accept sock
-                        let who = Unauthed addr
+                        let who = ClientThread (Unauthed addr)
                         verbose' directory who "Connection established"
-                        _ <- runThread tid ClientThread (show addr) $
+                        _ <- runThread directory tid (AddrThread addr) $
                              startSsl defaultProtocolVersion directory who conn
                         mainLoop
-      verbose' directory Main "Server listening"
+      verbose' directory (CoreThread MainThread) "Server listening"
       mainLoop
 
 fpServerPem :: FilePath
@@ -244,7 +287,7 @@ authClient pv directory h who mu
                                                    h user pv directory tod
                              evalServerMonad handleClient serverState
                                  `finally`
-                                 verbose' directory (User user) "Disconnected"
+                                 verbose' directory (ClientThread (User user)) "Disconnected"
                   _ ->
                       do sendHandle directory h who respHuh "I don't understand"
                          authClient pv directory h who mu
@@ -260,27 +303,6 @@ authClient pv directory h who mu
     where authFailed reason = do verbose' directory who ("Auth failed: " ++ reason)
                                  sendHandle directory h who respAuthFailed "auth failed"
                                  authClient pv directory h who mu
-
-verbose :: String -> ServerMonad ()
-verbose str = do directory <- getDirectory
-                 u <- getUser
-                 liftIO $ verbose' directory (User u) str
-
-verbose' :: Directory -> Who -> String -> IO ()
-verbose' directory w str
- = do lt <- getLocalTimeInTz directory "UTC"
-      let fmt = "[%Y-%m-%d %H:%M:%S]"
-          t = formatTime defaultTimeLocale fmt lt
-      putMVar (dir_messagerVar directory)
-              (Message Verbose $ unwords [t, pprWho w, str])
-
-data Who = User User | Unauthed SockAddr | Notifier | Main
-
-pprWho :: Who -> String
-pprWho (User u) = "[U:" ++ u ++ "]"
-pprWho (Unauthed a) = "[unauthed:" ++ show a ++ "]"
-pprWho Notifier = "[notifier]"
-pprWho Main     = "[main]"
 
 sendHandle :: Handlelike h
            => Directory -> h -> Who -> Response -> String -> IO ()
@@ -487,12 +509,6 @@ scheduledTimePassed lastTime curTime scheduledTime
    || ((lastTime < scheduledTime) && (curTime < lastTime))
       -- the clock has wrapped, then the time has passed:
    || ((scheduledTime <= curTime) && (curTime < lastTime))
-
-getLocalTimeInTz :: Directory -> String -> IO LocalTime
-getLocalTimeInTz directory tz
- = do mv <- newEmptyMVar
-      putMVar (dir_timeMasterVar directory) (tz, mv)
-      takeMVar mv
 
 getTodInTz :: Directory -> String -> IO TimeOfDay
 getTodInTz directory tz = liftM localTimeOfDay $ getLocalTimeInTz directory tz

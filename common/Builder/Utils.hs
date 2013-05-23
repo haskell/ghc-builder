@@ -6,7 +6,7 @@ module Builder.Utils (
               respOK, respSizedThingFollows, respSendSizedThing,
               respHuh, respAuthFailed, respIForgotYou,
               User, Pass, port, Verbosity (..), Result(..),
-              die, warn, lastN, maybeRead, maybeReadSpace,
+              die, lastN, maybeRead, maybeReadSpace,
               readBinaryFile, maybeReadBinaryFile, maybeReadSizedBinaryFile,
               writeBinaryFile, maybeWriteBinaryFile,
               readFromFile, maybeReadFromFile,

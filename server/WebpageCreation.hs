@@ -16,8 +16,8 @@ import System.Exit
 import System.FilePath
 import Text.XHtml.Strict
 
-createWebPage :: Config -> User -> BuildNum -> IO String
-createWebPage config u bn
+createWebPage :: (String -> IO ()) -> Config -> User -> BuildNum -> IO String
+createWebPage warn config u bn
  = do let urlRoot = config_urlRoot config
           usersDir = baseDir </> "clients"
           root = Server usersDir u
@@ -31,8 +31,8 @@ createWebPage config u bn
       mapM_ (mkStepPage root u bn) steps
       (relPage, result) <- mkBuildPage root config u bn steps
       mEndTime <- getEndTime' root bn steps
-      mkBuilderIndex root webBuilderDir u bn mEndTime result
-      mkIndex usersDir webRootDir u bn mEndTime result
+      mkBuilderIndex warn root webBuilderDir u bn mEndTime result
+      mkIndex warn usersDir webRootDir u bn mEndTime result
       return (urlRoot </> relPage)
 
 mkStepPage :: Root -> User -> BuildNum -> BuildStepNum -> IO ()
@@ -160,10 +160,10 @@ data BuilderIndexData
            }
     deriving (Show, Read)
 
-mkBuilderIndex :: Root -> FilePath -> User -> BuildNum
+mkBuilderIndex :: (String -> IO ()) -> Root -> FilePath -> User -> BuildNum
                -> Maybe EndTime -> Result
                -> IO ()
-mkBuilderIndex root webBuilderDir u bn mEndTime result
+mkBuilderIndex warn root webBuilderDir u bn mEndTime result
  = do let builderIndexPage = webBuilderDir </> "index.html"
           builderIndexDataFile = webBuilderDir </> "index.dat"
       mBuilderIndexData <- maybeReadFromFile builderIndexDataFile
@@ -217,9 +217,10 @@ data IndexData = IndexData {
 indexWidth :: Int
 indexWidth = 10
 
-mkIndex :: FilePath -> FilePath -> User -> BuildNum -> Maybe EndTime -> Result
+mkIndex :: (String -> IO ()) -> FilePath -> FilePath
+        -> User -> BuildNum -> Maybe EndTime -> Result
         -> IO ()
-mkIndex usersDir webDir u bn mEndTime result
+mkIndex warn usersDir webDir u bn mEndTime result
  = do let indexPage = webDir </> "index.html"
           indexDataFile = webDir </> "index.dat"
       mIndexData <- maybeReadFromFile indexDataFile

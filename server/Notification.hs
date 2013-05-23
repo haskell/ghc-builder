@@ -11,7 +11,8 @@ notifier :: Directory -> IO ()
 notifier directory
  = do (user, bn) <- takeMVar (dir_notifierVar directory)
       config <- getConfig directory
-      webpage <- createWebPage config user bn
+      let warn = warn' directory (ClientThread (User user))
+      webpage <- createWebPage warn config user bn
       sendEmails config user bn webpage
       notifier directory
 

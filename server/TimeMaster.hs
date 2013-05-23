@@ -10,15 +10,15 @@ import System.Posix.Env
 timeMaster :: TimeMasterVar -> IO ()
 timeMaster tmvar
  = do (timezone, mv) <- takeMVar tmvar
-      lt <- getLocalTimeInTz timezone
+      lt <- getLocalTimeInTimezone timezone
       putMVar mv lt
       timeMaster tmvar
 
-getLocalTimeInTz :: String -> IO LocalTime
-getLocalTimeInTz tz = do setEnv "TZ" tz True
-                         tzset
-                         t <- getZonedTime
-                         return $ zonedTimeToLocalTime t
+getLocalTimeInTimezone :: String -> IO LocalTime
+getLocalTimeInTimezone tz = do setEnv "TZ" tz True
+                               tzset
+                               t <- getZonedTime
+                               return $ zonedTimeToLocalTime t
 
 foreign import ccall "time.h tzset" tzset :: IO ()
 

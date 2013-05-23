@@ -4,7 +4,6 @@ module ConfigHandler (configHandler) where
 import ServerMonad
 
 import Builder.Config
-import Builder.Utils
 
 import GHC
 import Linker
@@ -17,19 +16,21 @@ import Control.Monad
 import Data.Dynamic
 import GHC.Paths
 
-configHandler :: CHVar -> IO ()
-configHandler chv = do m <- loadConfig
-                       case m of
-                           Right config -> worker chv config
-                           Left err ->
-                               do warn ("Can't load config:\n" ++ err)
-                                  warn "Sleeping 5 seconds..."
-                                  threadDelay 5000000
-                                  warn "...retrying"
-                                  configHandler chv
+configHandler :: Directory -> CHVar -> IO ()
+configHandler directory chv
+    = do m <- loadConfig
+         case m of
+             Right config -> worker warn chv config
+             Left err ->
+                 do warn ("Can't load config:\n" ++ err)
+                    warn "Sleeping 5 seconds..."
+                    threadDelay 5000000
+                    warn "...retrying"
+                    configHandler directory chv
+    where warn = warn' directory (CoreThread ConfigThread)
 
-worker :: CHVar -> Config -> IO ()
-worker chv config
+worker :: (String -> IO ()) -> CHVar -> Config -> IO ()
+worker warn chv config
  = do req <- takeMVar chv
       case req of
           ReloadConfig ->
@@ -37,12 +38,12 @@ worker chv config
                  case e of
                      Left err ->
                          do warn ("Reloading config failed:\n" ++ err)
-                            worker chv config
+                            worker warn chv config
                      Right config' ->
-                         worker chv config'
+                         worker warn chv config'
           GiveMeConfig mv ->
               do putMVar mv config
-                 worker chv config
+                 worker warn chv config
 
 -- XXX Ought to catch exceptions, and return something more informative
 -- than a Maybe type
