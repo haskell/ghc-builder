@@ -23,7 +23,6 @@ import Control.Monad.Trans
 import Data.Char
 import Data.List
 import Data.Maybe
-import Data.Time.Format
 import Data.Time.LocalTime
 import Network.Socket
 import OpenSSL
@@ -32,9 +31,9 @@ import OpenSSL.Session
 import OpenSSL.X509
 import System.Directory
 import System.Environment
+import System.Exit
 import System.FilePath
 import System.IO
-import System.Locale
 import System.Posix.Process
 import System.Posix.Signals
 
@@ -235,7 +234,7 @@ startSsl pv directory who s
                          contextSetCAFile sslContext fpRootPem
                          ssl <- OpenSSL.Session.connection sslContext s
                          OpenSSL.Session.accept ssl
-                         mUser <- verifySsl ssl
+                         mUser <- verifySsl directory ssl
                          sendHandle directory ssl who respOK "Welcome to SSL"
                          authClient pv directory (Ssl ssl) who mUser
                   "NO SSL" ->
@@ -244,15 +243,17 @@ startSsl pv directory who s
                   _ -> do sendHandle directory s who respHuh "Expected protocol version or SSL instructions"
                           startSsl pv directory who s
 
-verifySsl :: SSL -> IO (Maybe User)
-verifySsl ssl
+verifySsl :: Directory -> SSL -> IO (Maybe User)
+verifySsl directory ssl
  = do verified <- getVerifyResult ssl
-      unless verified $ die "Certificate doesn't verify"
+      unless verified $ do warn "Certificate doesn't verify"
+                           exitFailure
       mPeerCert <- getPeerCertificate ssl
       case mPeerCert of
           Nothing ->
               -- XXX We're hitting this branch. Is that expected?
-              -- die "No peer certificate"
+              -- do warn "No peer certificate"
+              --    exitFailure
               return Nothing
           Just peerCert ->
               do mapping <- getSubjectName peerCert False
@@ -260,7 +261,9 @@ verifySsl ssl
                      Just user ->
                          return (Just user)
                      Nothing ->
-                         die "Certificate has no CN"
+                         do warn "Certificate has no CN"
+                            exitFailure
+    where warn = warn' directory (CoreThread MainThread)
 
 authClient :: ProtocolVersion -> Directory -> HandleOrSsl -> Who -> Maybe User
            -> IO ()
