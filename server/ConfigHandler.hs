@@ -16,7 +16,6 @@ import Control.Exception
 import Control.Monad
 import Data.Dynamic
 import GHC.Paths
-import Prelude hiding (catch)
 
 configHandler :: CHVar -> IO ()
 configHandler chv = do m <- loadConfig

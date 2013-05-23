@@ -28,7 +28,6 @@ import OpenSSL
 import OpenSSL.PEM
 import OpenSSL.Session
 import OpenSSL.X509
-import Prelude hiding (catch)
 import System.Directory
 import System.Environment
 import System.FilePath
