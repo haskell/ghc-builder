@@ -5,9 +5,12 @@ import ServerMonad
 
 import Builder.Config
 
+import DynFlags
+import ErrUtils
 import GHC
 import Linker
 import MonadUtils
+import Outputable
 import Packages
 
 import Control.Concurrent
@@ -18,7 +21,7 @@ import GHC.Paths
 
 configHandler :: Directory -> CHVar -> IO ()
 configHandler directory chv
-    = do m <- loadConfig
+    = do m <- loadConfig warn
          case m of
              Right config -> worker warn chv config
              Left err ->
@@ -34,7 +37,7 @@ worker warn chv config
  = do req <- takeMVar chv
       case req of
           ReloadConfig ->
-              do e <- loadConfig
+              do e <- loadConfig warn
                  case e of
                      Left err ->
                          do warn ("Reloading config failed:\n" ++ err)
@@ -45,14 +48,15 @@ worker warn chv config
               do putMVar mv config
                  worker warn chv config
 
--- XXX Ought to catch exceptions, and return something more informative
--- than a Maybe type
-loadConfig :: IO (Either String Config)
-loadConfig = do
+loadConfig :: (String -> IO ()) -> IO (Either String Config)
+loadConfig warn = do
       runGhc (Just libdir) $ do
         dflags0 <- getSessionDynFlags
         let dflags1 = dflags0 {
-                          hscTarget = HscInterpreted
+                          hscTarget = HscInterpreted,
+                          log_action = logAction warn,
+                          flushOut = FlushOut $ return (),
+                          flushErr = FlushErr $ return ()
                       }
         _ <- setSessionDynFlags dflags1
 
@@ -80,4 +84,16 @@ loadConfig = do
             Nothing -> return (Left "config has wrong type")
     `catch` \e ->
         return (Left (show (e :: SomeException)))
+
+logAction :: (String -> IO ()) -> LogAction
+logAction warn dflags severity srcSpan _style msg
+ = do let locatedMsg = mkLocMessage severity srcSpan msg
+          msg' = case severity of
+                 SevOutput  -> text "GHC Output:" <+> msg
+                 SevDump    -> text "GHC Dump:"   <+> msg
+                 SevInfo    -> text "GHC Info:"   <+> msg
+                 SevFatal   -> text "GHC Fatal:"  <+> msg
+                 SevWarning -> locatedMsg
+                 SevError   -> locatedMsg
+      warn (showSDoc dflags msg')
 
