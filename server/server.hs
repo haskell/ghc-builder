@@ -3,7 +3,8 @@
 
 module Main where
 
-import qualified BuildSteps_0_1 as BS_0_1
+import BuildSteps_0_1 (from_0_2)
+import BuildSteps_0_2 (from_0_3)
 import ConfigHandler
 import Messager
 import Notification
@@ -135,7 +136,7 @@ runThread directory mainThread who f
                              when restart $ thread unmask
       _ <- forkIOWithUnmask thread
       return ()
-    where warn = warn' directory who
+    where myWarn = warn' directory who
           exceptionMsg e ms
            = unlines ([ppr who ++ " thread got an exception:", show e] ++ ms)
           asyncHandler :: AsyncException -> IO Bool
@@ -148,7 +149,7 @@ runThread directory mainThread who f
                       -- bother
                       return ()
                   _ ->
-                      do warn ("Got an asynchronous exception: " ++
+                      do myWarn ("Got an asynchronous exception: " ++
                                show (e :: AsyncException))
                          -- We want the above to get printed, but we are
                          -- about to terminate the program, so we need
@@ -158,11 +159,11 @@ runThread directory mainThread who f
                          -- If we can put a second message, then the
                          -- messager must have picked up the first
                          -- one...
-                         warn "Throwing to main"
+                         myWarn "Throwing to main"
                          -- ...and if we can put a third message, then
                          -- it must have printed the first and picked up
                          -- the second...
-                         warn "Bye"
+                         myWarn "Bye"
                          -- ...so now the first at least must have been
                          -- printed.
               throwTo mainThread e
@@ -182,10 +183,10 @@ runThread directory mainThread who f
                                  -- important.
                                  return ()
                              _ ->
-                                 warn (exceptionMsg e ["Restarting..."])
+                                 myWarn (exceptionMsg e ["Restarting..."])
                          return True
                   _ ->
-                      do warn (exceptionMsg e [])
+                      do myWarn (exceptionMsg e [])
                          return False
 
 listenForClients :: ThreadId -> Directory -> AddrInfo -> Socket -> IO ()
@@ -246,13 +247,13 @@ startSsl pv directory who s
 verifySsl :: Directory -> SSL -> IO (Maybe User)
 verifySsl directory ssl
  = do verified <- getVerifyResult ssl
-      unless verified $ do warn "Certificate doesn't verify"
+      unless verified $ do myWarn "Certificate doesn't verify"
                            exitFailure
       mPeerCert <- getPeerCertificate ssl
       case mPeerCert of
           Nothing ->
               -- XXX We're hitting this branch. Is that expected?
-              -- do warn "No peer certificate"
+              -- do myWarn "No peer certificate"
               --    exitFailure
               return Nothing
           Just peerCert ->
@@ -261,9 +262,9 @@ verifySsl directory ssl
                      Just user ->
                          return (Just user)
                      Nothing ->
-                         do warn "Certificate has no CN"
+                         do myWarn "Certificate has no CN"
                             exitFailure
-    where warn = warn' directory (CoreThread MainThread)
+    where myWarn = warn' directory (CoreThread MainThread)
 
 authClient :: ProtocolVersion -> Directory -> HandleOrSsl -> Who -> Maybe User
            -> IO ()
@@ -374,8 +375,11 @@ answerBuildInstructions ui
       let buildInstructions = mkBuildInstructions instructions thisBuildNum bss
       sendClient respSizedThingFollows "Instructions follow"
       case pv of
-          0.1 -> sendSizedThing $ BS_0_1.fromCurrent buildInstructions
-          _   -> sendSizedThing buildInstructions
+          0.1 -> sendSizedThing $ from_0_2 $ from_0_3 buildInstructions
+          0.2 -> sendSizedThing $            from_0_3 buildInstructions
+          0.3 -> sendSizedThing                       buildInstructions
+          _   -> do warn ("Unrecognised protocol version; " ++ show pv)
+                    liftIO exitFailure
       sendClient respOK "That's it"
 
 answerLastUploaded :: ServerMonad ()

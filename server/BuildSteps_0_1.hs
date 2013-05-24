@@ -3,57 +3,57 @@
              UndecidableInstances #-}
 
 module BuildSteps_0_1 (
-              toCurrent, fromCurrent
+              to_0_2, from_0_2
              ) where
 
-import qualified Builder.BuildSteps as BS
+import qualified BuildSteps_0_2 as BS
 import Builder.Utils
 
 class Translate a b | a -> b, b -> a where
-    toCurrent :: a -> b
-    fromCurrent :: b -> a
+    to_0_2 :: a -> b
+    from_0_2 :: b -> a
 
 instance Translate a b => Translate [a] [b] where
-    toCurrent = map toCurrent
-    fromCurrent = map fromCurrent
+    to_0_2 = map to_0_2
+    from_0_2 = map from_0_2
 
 instance Translate Integer Integer where
-    toCurrent = id
-    fromCurrent = id
+    to_0_2 = id
+    from_0_2 = id
 
 instance (Translate a1 b1, Translate a2 b2) =>
          Translate (a1, a2) (b1, b2) where
-    toCurrent (x, y) = (toCurrent x, toCurrent y)
-    fromCurrent (x, y) = (fromCurrent x, fromCurrent y)
+    to_0_2 (x, y) = (to_0_2 x, to_0_2 y)
+    from_0_2 (x, y) = (from_0_2 x, from_0_2 y)
 
 instance Translate BuildInstructions BS.BuildInstructions where
-    toCurrent bi = BS.BuildInstructions {
-                       BS.bi_instructions = bi_instructions bi,
-                       BS.bi_buildNum     = bi_buildNum bi,
-                       BS.bi_buildSteps   = toCurrent (bi_buildSteps bi)
-                   }
+    to_0_2 bi = BS.BuildInstructions {
+                    BS.bi_instructions = bi_instructions bi,
+                    BS.bi_buildNum     = bi_buildNum bi,
+                    BS.bi_buildSteps   = to_0_2 (bi_buildSteps bi)
+                }
 
-    fromCurrent bi = BuildInstructions {
-                         bi_instructions = BS.bi_instructions bi,
-                         bi_buildNum     = BS.bi_buildNum bi,
-                         bi_buildSteps   = fromCurrent (BS.bi_buildSteps bi)
-                     }
+    from_0_2 bi = BuildInstructions {
+                      bi_instructions = BS.bi_instructions bi,
+                      bi_buildNum     = BS.bi_buildNum bi,
+                      bi_buildSteps   = from_0_2 (BS.bi_buildSteps bi)
+                  }
 
 instance Translate BuildStep BS.BuildStep where
-    toCurrent bs = BS.BuildStep {
-                       BS.bs_name   = bs_name   bs,
-                       BS.bs_subdir = bs_subdir bs,
-                       BS.bs_prog   = bs_prog   bs,
-                       BS.bs_args   = bs_args   bs,
-                       BS.bs_mailOutput = False
-                   }
+    to_0_2 bs = BS.BuildStep {
+                    BS.bs_name       = bs_name   bs,
+                    BS.bs_subdir     = bs_subdir bs,
+                    BS.bs_prog       = bs_prog   bs,
+                    BS.bs_args       = bs_args   bs,
+                    BS.bs_mailOutput = False
+                }
 
-    fromCurrent bs = BuildStep {
-                         bs_name   = BS.bs_name   bs,
-                         bs_subdir = BS.bs_subdir bs,
-                         bs_prog   = BS.bs_prog   bs,
-                         bs_args   = BS.bs_args   bs
-                     }
+    from_0_2 bs = BuildStep {
+                      bs_name   = BS.bs_name   bs,
+                      bs_subdir = BS.bs_subdir bs,
+                      bs_prog   = BS.bs_prog   bs,
+                      bs_args   = BS.bs_args   bs
+                  }
 
 data BuildInstructions = BuildInstructions {
                              bi_instructions :: Instructions,

@@ -16,7 +16,7 @@ module ServerMonad (
                     TimeMasterVar, getLocalTimeInTz,
                     baseDir,
                     Ppr(..), Who(..), ClientThread(..), CoreThread(..),
-                    verbose, verbose', warn',
+                    verbose, verbose', warn, warn',
                    ) where
 
 import Builder.Config
@@ -133,6 +133,11 @@ verbose :: String -> ServerMonad ()
 verbose str = do directory <- getDirectory
                  u <- getUser
                  liftIO $ verbose' directory (ClientThread (User u)) str
+
+warn :: String -> ServerMonad ()
+warn str = do directory <- getDirectory
+              u <- getUser
+              liftIO $ warn' directory (ClientThread (User u)) str
 
 verbose' :: Directory -> Who -> String -> IO ()
 verbose' directory who str = message' directory Verbose who str
