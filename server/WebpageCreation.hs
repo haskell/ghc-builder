@@ -17,7 +17,7 @@ import System.FilePath
 import Text.XHtml.Strict
 
 createWebPage :: (String -> IO ()) -> Config -> User -> BuildNum -> IO String
-createWebPage warn config u bn
+createWebPage myWarn config u bn
  = do let urlRoot = config_urlRoot config
           usersDir = baseDir </> "clients"
           root = Server usersDir u
@@ -31,8 +31,8 @@ createWebPage warn config u bn
       mapM_ (mkStepPage root u bn) steps
       (relPage, result) <- mkBuildPage root config u bn steps
       mEndTime <- getEndTime' root bn steps
-      mkBuilderIndex warn root webBuilderDir u bn mEndTime result
-      mkIndex warn usersDir webRootDir u bn mEndTime result
+      mkBuilderIndex myWarn root webBuilderDir u bn mEndTime result
+      mkIndex myWarn usersDir webRootDir u bn mEndTime result
       return (urlRoot </> relPage)
 
 mkStepPage :: Root -> User -> BuildNum -> BuildStepNum -> IO ()
@@ -163,7 +163,7 @@ data BuilderIndexData
 mkBuilderIndex :: (String -> IO ()) -> Root -> FilePath -> User -> BuildNum
                -> Maybe EndTime -> Result
                -> IO ()
-mkBuilderIndex warn root webBuilderDir u bn mEndTime result
+mkBuilderIndex myWarn root webBuilderDir u bn mEndTime result
  = do let builderIndexPage = webBuilderDir </> "index.html"
           builderIndexDataFile = webBuilderDir </> "index.dat"
       mBuilderIndexData <- maybeReadFromFile builderIndexDataFile
@@ -172,8 +172,8 @@ mkBuilderIndex warn root webBuilderDir u bn mEndTime result
                        | bidNext i == bn ->
                           return ((bn, mEndTime, result) : bidBuildResults i)
                       _ ->
-                       do warn ("Failed to read " ++ show builderIndexDataFile
-                             ++ ". Recreating it.")
+                       do myWarn ("Failed to read " ++ show builderIndexDataFile
+                               ++ ". Recreating it.")
                           bns <- getBuildNumbers root
                           mapM (\bn' -> do res <- readBuildResult root bn'
                                            met <- getEndTime root bn'
@@ -220,7 +220,7 @@ indexWidth = 10
 mkIndex :: (String -> IO ()) -> FilePath -> FilePath
         -> User -> BuildNum -> Maybe EndTime -> Result
         -> IO ()
-mkIndex warn usersDir webDir u bn mEndTime result
+mkIndex myWarn usersDir webDir u bn mEndTime result
  = do let indexPage = webDir </> "index.html"
           indexDataFile = webDir </> "index.dat"
       mIndexData <- maybeReadFromFile indexDataFile
@@ -236,8 +236,8 @@ mkIndex warn usersDir webDir u bn mEndTime result
                               myOne' = take indexWidth ((bn, mEndTime, result) : myOne)
                           return ((u, myOne') : others)
                    _ ->
-                       do warn ("Failed to read " ++ show indexDataFile
-                             ++ ". Recreating it.")
+                       do myWarn ("Failed to read " ++ show indexDataFile
+                               ++ ". Recreating it.")
                           regenerateIndexData usersDir
       let html = mkIndexHtml indexData
       writeToFile indexDataFile (IndexData indexData)

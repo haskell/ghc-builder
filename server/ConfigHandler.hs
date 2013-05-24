@@ -21,40 +21,40 @@ import GHC.Paths
 
 configHandler :: Directory -> CHVar -> IO ()
 configHandler directory chv
-    = do m <- loadConfig warn
+    = do m <- loadConfig myWarn
          case m of
-             Right config -> worker warn chv config
+             Right config -> worker myWarn chv config
              Left err ->
-                 do warn ("Can't load config:\n" ++ err)
-                    warn "Sleeping 5 seconds..."
+                 do myWarn ("Can't load config:\n" ++ err)
+                    myWarn "Sleeping 5 seconds..."
                     threadDelay 5000000
-                    warn "...retrying"
+                    myWarn "...retrying"
                     configHandler directory chv
-    where warn = warn' directory (CoreThread ConfigThread)
+    where myWarn = warn' directory (CoreThread ConfigThread)
 
 worker :: (String -> IO ()) -> CHVar -> Config -> IO ()
-worker warn chv config
+worker myWarn chv config
  = do req <- takeMVar chv
       case req of
           ReloadConfig ->
-              do e <- loadConfig warn
+              do e <- loadConfig myWarn
                  case e of
                      Left err ->
-                         do warn ("Reloading config failed:\n" ++ err)
-                            worker warn chv config
+                         do myWarn ("Reloading config failed:\n" ++ err)
+                            worker myWarn chv config
                      Right config' ->
-                         worker warn chv config'
+                         worker myWarn chv config'
           GiveMeConfig mv ->
               do putMVar mv config
-                 worker warn chv config
+                 worker myWarn chv config
 
 loadConfig :: (String -> IO ()) -> IO (Either String Config)
-loadConfig warn = do
+loadConfig myWarn = do
       runGhc (Just libdir) $ do
         dflags0 <- getSessionDynFlags
         let dflags1 = dflags0 {
                           hscTarget = HscInterpreted,
-                          log_action = logAction warn,
+                          log_action = logAction myWarn,
                           flushOut = FlushOut $ return (),
                           flushErr = FlushErr $ return ()
                       }
@@ -86,7 +86,7 @@ loadConfig warn = do
         return (Left (show (e :: SomeException)))
 
 logAction :: (String -> IO ()) -> LogAction
-logAction warn dflags severity srcSpan _style msg
+logAction myWarn dflags severity srcSpan _style msg
  = do let locatedMsg = mkLocMessage severity srcSpan msg
           msg' = case severity of
                  SevOutput  -> text "GHC Output:" <+> msg
@@ -95,5 +95,5 @@ logAction warn dflags severity srcSpan _style msg
                  SevFatal   -> text "GHC Fatal:"  <+> msg
                  SevWarning -> locatedMsg
                  SevError   -> locatedMsg
-      warn (showSDoc dflags msg')
+      myWarn (showSDoc dflags msg')
 
