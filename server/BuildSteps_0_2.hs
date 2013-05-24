@@ -46,7 +46,8 @@ instance Translate BuildStep BS.BuildStep where
                     BS.bs_subdir     = bs_subdir     bs,
                     BS.bs_prog       = bs_prog       bs,
                     BS.bs_args       = bs_args       bs,
-                    BS.bs_mailOutput = bs_mailOutput bs
+                    BS.bs_mailOutput = bs_mailOutput bs,
+                    BS.bs_fileUpload = False
                 }
 
     from_0_3 bs = BuildStep {

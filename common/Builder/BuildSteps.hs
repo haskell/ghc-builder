@@ -17,7 +17,8 @@ data BuildStep = BuildStep {
                      bs_subdir :: FilePath,
                      bs_prog :: FilePath,
                      bs_args :: [String],
-                     bs_mailOutput :: Bool
+                     bs_mailOutput :: Bool,
+                     bs_fileUpload :: Bool
                  }
     deriving (Show, Read)
 
