@@ -14,6 +14,7 @@ import Data.Time.Clock.POSIX
 import System.Directory
 import System.Exit
 import System.FilePath
+import System.Posix.Files
 import Text.XHtml.Strict
 
 createWebPage :: (String -> IO ()) -> Config -> User -> BuildNum -> IO String
@@ -28,6 +29,9 @@ createWebPage myWarn config u bn
                `onDoesNotExist`
                return []
       createDirectory webBuildDir
+      createSymbolicLink
+          ("../../../../clients/igtest/builds/" ++ show bn ++ "/files")
+          (webBuildDir </> "files")
       mapM_ (mkStepPage root u bn) steps
       (relPage, result) <- mkBuildPage root config u bn steps
       mEndTime <- getEndTime' root bn steps
@@ -45,14 +49,15 @@ mkStepPage root u bn bsn
           maybeToShowHtml :: Show a => Maybe a -> Html
           maybeToShowHtml = maybeToHtmlWith show
           maybeToTimeHtml = maybeToHtmlWith endTimeToString
-      mstepName  <- readMaybeBuildStepName      root bn bsn
-      msubdir    <- readMaybeBuildStepSubdir    root bn bsn
-      mprog      <- readMaybeBuildStepProg      root bn bsn
-      margs      <- readMaybeBuildStepArgs      root bn bsn
-      mec        <- readMaybeBuildStepExitcode  root bn bsn
-      mStartTime <- readMaybeBuildStepStartTime root bn bsn
-      mEndTime   <- readMaybeBuildStepEndTime   root bn bsn
-      outputHtml <- getOutputHtml               root bn bsn
+      mstepName     <- readMaybeBuildStepName        root bn bsn
+      msubdir       <- readMaybeBuildStepSubdir      root bn bsn
+      mprog         <- readMaybeBuildStepProg        root bn bsn
+      margs         <- readMaybeBuildStepArgs        root bn bsn
+      mec           <- readMaybeBuildStepExitcode    root bn bsn
+      mStartTime    <- readMaybeBuildStepStartTime   root bn bsn
+      mEndTime      <- readMaybeBuildStepEndTime     root bn bsn
+      uploadHtml    <- mkUpload True                 root bn bsn
+      outputHtml    <- getOutputHtml                 root bn bsn
       let descriptionHtml = stringToHtml (u ++ ", build " ++ show bn ++ ", step " ++ show bsn ++ ": ") +++ maybeToHtml mstepName
           html = header headerHtml
              +++ body bodyHtml
@@ -60,6 +65,7 @@ mkStepPage root u bn bsn
                  +++ summaryHtml
                  +++ outputHtml
                  +++ resultHtml
+                 +++ uploadHtml
           headerHtml = thetitle descriptionHtml
                    +++ (thelink ! [rel "Stylesheet",
                                    thetype "text/css",
@@ -85,6 +91,7 @@ mkBuildPage root config u bn bsns
           page = baseDir </> "web" </> relPage
       links <- mapM (mkLink root bn) bsns
       result <- readBuildResult root bn
+      uploads <- mapM (mkUpload False root bn) bsns
       outputs <- mapM (mkOutput root bn) bsns
       let builderDescription = case lookup u (config_clients config) of
                                Just ui -> " (" ++ ui_description ui ++ ")"
@@ -97,6 +104,7 @@ mkBuildPage root config u bn bsns
                  +++ ulist (concatHtml (map li links))
                  +++ (paragraph ! [theclass (resultToLinkClass result)])
                          (stringToHtml $ show result)
+                 +++ concatHtml uploads
                  +++ concatHtml outputs
           headerHtml = thetitle descriptionHtml
                    +++ (thelink ! [rel "Stylesheet",
@@ -118,6 +126,18 @@ mkLink root bn bsn
                          _ -> "failure"
          return ((anchor ! [href url, theclass linkClass])
                     (stringToHtml (show bsn ++ ": " ++ stepName)))
+
+mkUpload :: Bool -> Root -> BuildNum -> BuildStepNum -> IO Html
+mkUpload inBuildDir root bn bsn
+    = do mFileUploaded <- getMaybeBuildStepFileUploaded root bn bsn
+         return $ case mFileUploaded of
+                  Just fn ->
+                      let relFn = if inBuildDir then             "files/" ++ fn
+                                                else show bn ++ "/files/" ++ fn
+                      in (thediv ! [theclass "upload"])
+                             (stringToHtml "Upload: " +++
+                              (anchor ! [href relFn]) (stringToHtml fn))
+                  Nothing -> noHtml
 
 mkOutput :: Root -> BuildNum -> BuildStepNum -> IO Html
 mkOutput root bn bsn
