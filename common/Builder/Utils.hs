@@ -16,7 +16,7 @@ module Builder.Utils (
               getSortedNumericDirectoryContents,
               getInterestingDirectoryContents,
               withCurrentDirectory,
-              onDoesNotExist, onEndOfFile, ignoreDoesNotExist,
+              onDoesNotExist, ignoreEndOfFile, onEndOfFile, ignoreDoesNotExist,
               onConnectionDropped, onConnectionFailed,
               Instructions(..),
               BuildTime(..),
@@ -42,7 +42,7 @@ import System.IO
 import System.IO.Error hiding (catch)
 
 newtype ProtocolVersion = ProtocolVersion Deci
-    deriving (Eq, Num, Fractional)
+    deriving (Eq, Ord, Num, Fractional)
 
 instance Show ProtocolVersion where
     showsPrec p (ProtocolVersion d) = showsPrec p d
@@ -291,8 +291,7 @@ withCurrentDirectory dir io = do curDir <- getCurrentDirectory
                                      `finally` setCurrentDirectory curDir
 
 ignoreDoesNotExist :: IO () -> IO ()
-ignoreDoesNotExist io = io `catch` \e -> unless (isDoesNotExistError e)
-                                                (throwIO e)
+ignoreDoesNotExist io = onDoesNotExist io (return ())
 
 onDoesNotExist :: IO a -> IO a -> IO a
 onDoesNotExist io io' = io `catch` \e -> if isDoesNotExistError e
@@ -316,6 +315,9 @@ onConnectionFailed io io'
         "Connection timed out (WSAETIMEDOUT)"])
    then io'
    else throwIO e
+
+ignoreEndOfFile :: IO () -> IO ()
+ignoreEndOfFile io = onEndOfFile io (return ())
 
 onEndOfFile :: IO a -> IO a -> IO a
 onEndOfFile io io' = io `catch` \e -> if isEOFError e

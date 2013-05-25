@@ -217,7 +217,7 @@ startSsl pv directory who s
           Just verStr ->
               case maybeRead verStr of
                   Just pv'
-                   | pv' `elem` [0.1, 0.2] ->
+                   | pv' `elem` [0.1, 0.2, 0.3] ->
                       do sendHandle directory s who respOK "Protocol version OK"
                          startSsl pv' directory who s
                   _ ->
@@ -431,9 +431,11 @@ receiveBuildStep buildNum buildStepNum
           userDir = baseDir </> "clients" </> user
           buildDir = userDir </> "builds" </> show buildNum
           stepsDir = buildDir </> "steps"
+          filesDir = buildDir </> "files"
           buildStepDir = stepsDir </> show buildStepNum
       liftIO $ createDirectoryIfMissing False buildDir
       liftIO $ createDirectoryIfMissing False stepsDir
+      liftIO $ createDirectoryIfMissing False filesDir
       liftIO $ createDirectoryIfMissing False buildStepDir
       -- Get the name
       sendClient respSendSizedThing "Send name"
@@ -451,7 +453,7 @@ receiveBuildStep buildNum buildStepNum
       sendClient respSendSizedThing "Send args"
       margs <- getMaybeSizedThing
       putMaybeBuildStepArgs root buildNum buildStepNum margs
-      unless (pv == 0.1) $ do
+      when (pv >= 0.2) $ do
           -- Get the mailOutput
           sendClient respSendSizedThing "Send mailOutput"
           mMailOutput <- getMaybeSizedThing
@@ -472,6 +474,20 @@ receiveBuildStep buildNum buildStepNum
       sendClient respSendSizedThing "Send output"
       moutput <- getMaybeSizedThing
       putMaybeBuildStepOutput root buildNum buildStepNum moutput
+      when (pv >= 0.3) $ do
+          -- Get the file upload, if there is one
+          sendClient respSendSizedThing "Send fileUploaded"
+          mFileUploaded <- getMaybeSizedThing
+          let mFileUploaded' = fmap takeFileName mFileUploaded
+          putMaybeBuildStepFileUploaded root buildNum buildStepNum
+                                        mFileUploaded'
+          case mFileUploaded' of
+              Nothing ->
+                  return ()
+              Just fn ->
+                  do sendClient respSendSizedThing "Send fileUpload"
+                     mFileUpload <- getMaybeSizedThing
+                     putMaybeBuildStepFileUpload root buildNum fn mFileUpload
       -- and tell the client that we're done, so it can delete its copy
       -- of the files
       sendClient respOK "Got it, thanks!"

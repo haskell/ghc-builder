@@ -14,6 +14,7 @@ import Builder.Utils
 import Control.Concurrent
 import Control.Exception
 import Control.Monad.State
+import Data.Maybe
 import Data.Time.Clock.POSIX
 import Data.Time.Format
 import Data.Time.LocalTime
@@ -122,7 +123,7 @@ runClient v mainFun
 
 doClient :: FilePath -> ClientMonad () -> ClientMonad ()
 doClient curDir mainFun
- = do sendServer "PROTO 0.2"
+ = do sendServer "PROTO 0.3"
       getTheResponseCode respOK
       startSsl curDir
       authenticate
@@ -281,7 +282,11 @@ runBuildStep bn (bsn, bs)
           prog         = bs_prog       bs
           args         = bs_args       bs
           mailOutput   = bs_mailOutput bs
+          fileUpload   = bs_fileUpload bs
           buildStepDir = baseDir </> "builds" </> show bn </> "steps" </> show bsn
+          combinedOutputFile = buildStepDir </> "output"
+          outputFile = buildStepDir </> "fileUploaded"
+          mOutputFile = if fileUpload then Just outputFile else Nothing
       liftIO $ createDirectory buildStepDir
       writeBuildStepName       root bn bsn name
       writeBuildStepStartTime  root bn bsn startTime
@@ -290,8 +295,12 @@ runBuildStep bn (bsn, bs)
       writeBuildStepArgs       root bn bsn args
       writeBuildStepMailOutput root bn bsn mailOutput
       ec <- liftIO $ withCurrentDirectory (tempBuildDir </> subdir)
-                   $ run prog args (buildStepDir </> "output")
+                   $ run prog args combinedOutputFile mOutputFile
       writeBuildStepExitcode root bn bsn ec
+      when fileUpload $ liftIO $ ignoreDoesNotExist $
+          do fn <- readFile outputFile
+             copyFile (tempBuildDir </> subdir </> fn)
+                      (buildStepDir </> "fileUpload")
       endTime <- getUTCTime
       writeBuildStepEndTime root bn bsn endTime
       return ec
@@ -326,6 +335,7 @@ uploadBuildResults bn
           sendString f = do getTheResponseCode respSendSizedThing
                             m <- f
                             putMaybeSizedThing m
+                            return $ isJust m
           sendSizedString f = do getTheResponseCode respSendSizedThing
                                  m <- f
                                  putMaybeGivenSizedThing m
@@ -342,23 +352,27 @@ uploadBuildResults bn
                    sendServer ("UPLOAD " ++ show bn ++ " " ++ show bsn)
                    mapM_ sendString strings
                    sendSizedString (getMaybeSizedBuildStepOutput root bn bsn)
+                   haveFile <- sendString (getMaybeBuildStepFileUploaded root bn bsn)
+                   when haveFile $ sendSizedString (getMaybeSizedBuildStepFileUpload root bn bsn)
                    getTheResponseCode respOK
-                   removeBuildStepName       root bn bsn
-                   removeBuildStepSubdir     root bn bsn
-                   removeBuildStepProg       root bn bsn
-                   removeBuildStepArgs       root bn bsn
-                   removeBuildStepMailOutput root bn bsn
-                   removeBuildStepStartTime  root bn bsn
-                   removeBuildStepEndTime    root bn bsn
-                   removeBuildStepExitcode   root bn bsn
-                   removeBuildStepOutput     root bn bsn
+                   removeBuildStepName         root bn bsn
+                   removeBuildStepSubdir       root bn bsn
+                   removeBuildStepProg         root bn bsn
+                   removeBuildStepArgs         root bn bsn
+                   removeBuildStepMailOutput   root bn bsn
+                   removeBuildStepStartTime    root bn bsn
+                   removeBuildStepEndTime      root bn bsn
+                   removeBuildStepExitcode     root bn bsn
+                   removeBuildStepOutput       root bn bsn
+                   removeBuildStepFileUploaded root bn bsn
+                   removeBuildStepFileUpload   root bn bsn
                    liftIO $ removeDirectory stepDir
       bsns <- liftIO $ getBuildStepNumbers root bn
       mapM_ sendStep bsns
       liftIO $ removeDirectory stepsDir
       sendServer ("RESULT " ++ show bn)
-      sendString $ getMaybeBuildInstructions root bn
-      sendString $ getMaybeBuildResult root bn
+      void $ sendString $ getMaybeBuildInstructions root bn
+      void $ sendString $ getMaybeBuildResult root bn
       getTheResponseCode respOK
       removeBuildInstructions root bn
       removeBuildResult root bn

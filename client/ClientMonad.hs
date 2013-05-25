@@ -12,7 +12,7 @@ import Builder.Utils
 import Control.Monad.State
 
 newtype ClientMonad a = ClientMonad (StateT ClientState IO a)
-    deriving (Monad, MonadIO)
+    deriving (Functor, Monad, MonadIO)
 
 data ClientState = ClientState {
                        cs_user :: User,

@@ -40,6 +40,13 @@ module Builder.Files (
  getMaybeSizedBuildStepOutput,
  getMaybeBuildStepOutput,       putMaybeBuildStepOutput,
  --
+ removeBuildStepFileUploaded,
+ getMaybeBuildStepFileUploaded, putMaybeBuildStepFileUploaded,
+ --
+ removeBuildStepFileUpload,
+ getMaybeSizedBuildStepFileUpload,
+                                putMaybeBuildStepFileUpload,
+ --
  removeBuildResult,
  getMaybeBuildResult,           putMaybeBuildResult,
  readBuildResult,               writeBuildResult,
@@ -69,6 +76,9 @@ mkPath (Server root user) fp = root </> user </> fp
 
 dirBuildStep :: BuildNum -> BuildStepNum -> FilePath
 dirBuildStep bn bsn = "builds" </> show bn </> "steps" </> show bsn
+
+dirBuildFiles :: BuildNum -> FilePath
+dirBuildFiles bn = "builds" </> show bn </> "files"
 
 --
 
@@ -365,6 +375,61 @@ putMaybeBuildStepOutput :: MonadIO m
                         -> m ()
 putMaybeBuildStepOutput root bn bsn m
  = maybeWriteBinaryFile (fpBuildStepOutput root bn bsn) m
+
+--
+
+fpBuildStepFileUploaded :: Root -> BuildNum -> BuildStepNum -> FilePath
+fpBuildStepFileUploaded root bn bsn
+ = mkPath root (dirBuildStep bn bsn </> "fileUploaded")
+
+removeBuildStepFileUploaded :: MonadIO m
+                            => Root -> BuildNum -> BuildStepNum -> m ()
+removeBuildStepFileUploaded root bn bsn
+ = liftIO $ ignoreDoesNotExist $
+   removeFile (fpBuildStepFileUploaded root bn bsn)
+
+getMaybeBuildStepFileUploaded :: MonadIO m
+                              => Root -> BuildNum -> BuildStepNum
+                              -> m (Maybe String)
+getMaybeBuildStepFileUploaded root bn bsn
+ = maybeReadBinaryFile (fpBuildStepFileUploaded root bn bsn)
+
+putMaybeBuildStepFileUploaded :: MonadIO m
+                              => Root -> BuildNum -> BuildStepNum
+                              -> Maybe String
+                              -> m ()
+putMaybeBuildStepFileUploaded root bn bsn m
+ = maybeWriteBinaryFile (fpBuildStepFileUploaded root bn bsn) m
+
+--
+
+fpBuildStepFileUploadClient :: Root -> BuildNum -> BuildStepNum -> FilePath
+fpBuildStepFileUploadClient root bn bsn
+ = mkPath root (dirBuildStep bn bsn </> "fileUpload")
+
+fpBuildStepFileUploadServer :: Root -> BuildNum -> FilePath
+                            -> FilePath
+fpBuildStepFileUploadServer root bn fn
+ = mkPath root (dirBuildFiles bn </> fn)
+
+removeBuildStepFileUpload :: MonadIO m
+                          => Root -> BuildNum -> BuildStepNum -> m ()
+removeBuildStepFileUpload root bn bsn
+ = liftIO $ ignoreDoesNotExist $
+   removeFile (fpBuildStepFileUploadClient root bn bsn)
+
+getMaybeSizedBuildStepFileUpload :: MonadIO m
+                                 => Root -> BuildNum -> BuildStepNum
+                                 -> m (Maybe (Integer, String))
+getMaybeSizedBuildStepFileUpload root bn bsn
+ = maybeReadSizedBinaryFile (fpBuildStepFileUploadClient root bn bsn)
+
+putMaybeBuildStepFileUpload :: MonadIO m
+                            => Root -> BuildNum -> FilePath
+                            -> Maybe String
+                            -> m ()
+putMaybeBuildStepFileUpload root bn fn m
+ = maybeWriteBinaryFile (fpBuildStepFileUploadServer root bn fn) m
 
 -- Stuff in each build
 
