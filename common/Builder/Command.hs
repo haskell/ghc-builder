@@ -50,8 +50,7 @@ run prog args combinedOutputFile mStdoutFile
                         ignoreEndOfFile $ getLines hErr Nothing Stderr)
                      `finally`
                      putMVar mv Nothing
-      _ <- forkIO $ writeLines 2
-
+      writeLines 2
       waitForProcess ph
  `onDoesNotExist`
     return (ExitFailure 1)
