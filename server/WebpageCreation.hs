@@ -30,7 +30,7 @@ createWebPage myWarn config u bn
                return []
       createDirectory webBuildDir
       createSymbolicLink
-          ("../../../../clients/igtest/builds/" ++ show bn ++ "/files")
+          ("../../../../clients/" ++ u ++ "/builds/" ++ show bn ++ "/files")
           (webBuildDir </> "files")
       mapM_ (mkStepPage root u bn) steps
       (relPage, result) <- mkBuildPage root config u bn steps
