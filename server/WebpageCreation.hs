@@ -32,12 +32,26 @@ createWebPage myWarn config u bn
       createSymbolicLink
           ("../../../../clients/" ++ u ++ "/builds/" ++ show bn ++ "/files")
           (webBuildDir </> "files")
+      symlinkUploads root u bn steps
       mapM_ (mkStepPage root u bn) steps
       (relPage, result) <- mkBuildPage root config u bn steps
       mEndTime <- getEndTime' root bn steps
       mkBuilderIndex myWarn root webBuilderDir u bn mEndTime result
       mkIndex myWarn usersDir webRootDir u bn mEndTime result
       return (urlRoot </> relPage)
+
+symlinkUploads :: Root -> User -> BuildNum -> [BuildStepNum] -> IO ()
+symlinkUploads root u bn bsns
+    = do mFileUploadeds <- mapM (getMaybeBuildStepFileUploaded root bn) bsns
+         case catMaybes mFileUploadeds of
+             [] -> return ()
+             fns ->
+                 do let dir = baseDir </> "web/uploads" </> u
+                        f fn = createSymbolicLink
+                                   ("../../../clients/" ++ u ++ "/builds/" ++ show bn ++ "/files/" ++ fn)
+                                   (dir </> fn)
+                    createDirectoryIfMissing True dir
+                    mapM_ f fns
 
 mkStepPage :: Root -> User -> BuildNum -> BuildStepNum -> IO ()
 mkStepPage root u bn bsn
