@@ -15,5 +15,21 @@ cabal install --dependencies-only
 cabal build
 ```
 
+Controlling resource usage
+--------------------------
+
+It is recommended that you run the builder-client in a dedicated VM or
+container environment to control resources.  However, in the absence of that
+you can use ulimit on UNIX and UNIX-like systems to control the maximum
+resources that builder-client will consume.  Windows System Resource Manager
+can be used in a similar manner.
+
+### Example: Run builder-client with a 2GB virtual memory limit
+
+```
+ulimit -v 2000000
+builder-client -v
+```
+
 See Also:
 https://ghc.haskell.org/trac/ghc/wiki/Builder
