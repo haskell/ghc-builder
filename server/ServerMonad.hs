@@ -1,4 +1,4 @@
-
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module ServerMonad (
@@ -23,12 +23,15 @@ import Builder.Config
 import Builder.Handlelike
 import Builder.Utils
 
+import Control.Applicative
 import Control.Concurrent.MVar
 import Control.Monad.State
 import Data.Time.Format
 import Data.Time.LocalTime
 import Network.Socket
+#if !MIN_VERSION_time(1,5,0)
 import System.Locale
+#endif
 
 type NVar = MVar (User, BuildNum)
 
@@ -48,7 +51,7 @@ baseDir :: FilePath
 baseDir = "data"
 
 newtype ServerMonad a = ServerMonad (StateT ServerState IO a)
-    deriving (Monad, MonadIO)
+    deriving (Functor, Applicative, Monad, MonadIO)
 
 data ServerState = ServerState {
                        ss_handleOrSsl :: HandleOrSsl,

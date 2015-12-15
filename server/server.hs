@@ -32,7 +32,7 @@ import OpenSSL.Session
 import OpenSSL.X509
 import System.Directory
 import System.Environment
-import System.Exit
+import System.Exit hiding (die)
 import System.FilePath
 import System.IO
 import System.Posix.Process
