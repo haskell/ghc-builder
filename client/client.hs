@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
 
 module Main (main) where
 
@@ -24,11 +25,13 @@ import OpenSSL.X509
 import Prelude hiding (catch)
 import System.Directory
 import System.Environment
-import System.Exit
+import System.Exit hiding (die)
 import System.FilePath
 import System.IO
 import System.IO.Error hiding (catch)
+#if !MIN_VERSION_time(1,5,0)
 import System.Locale
+#endif
 
 baseSubDir :: FilePath
 baseSubDir = "builder"
