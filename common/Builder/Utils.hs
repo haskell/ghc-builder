@@ -37,7 +37,7 @@ import GHC.IO.Exception (IOErrorType(TimeExpired, InvalidArgument))
 import OpenSSL.Session (SomeSSLException)
 import Prelude hiding (catch)
 import System.Directory
-import System.Exit
+import System.Exit hiding (die)
 import System.IO
 import System.IO.Error hiding (catch)
 

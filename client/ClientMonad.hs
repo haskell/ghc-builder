@@ -9,10 +9,11 @@ module ClientMonad (ClientMonad, evalClientMonad, mkClientState,
 import Builder.Handlelike
 import Builder.Utils
 
+import Control.Applicative
 import Control.Monad.State
 
 newtype ClientMonad a = ClientMonad (StateT ClientState IO a)
-    deriving (Functor, Monad, MonadIO)
+    deriving (Functor, Applicative, Monad, MonadIO)
 
 data ClientState = ClientState {
                        cs_user :: User,
