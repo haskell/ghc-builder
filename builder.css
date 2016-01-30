@@ -1,3 +1,6 @@
+a {
+    color: hsl(220, 100%, 20%);
+}
 
 body {
     background-color: white;
@@ -5,7 +8,7 @@ body {
 }
 
 .output {
-    border: solid #CCCCCC 1px;
+    border: solid #ddd 1px;
     margin: 0.5em;
     padding: 0.2em;
 }
@@ -15,7 +18,7 @@ body {
 }
 
 .stderr {
-    color: red;
+    color: hsl(0, 90%, 20%);
 }
 
 .panic {
@@ -23,15 +26,20 @@ body {
 }
 
 .success {
-    background-color: lime;
+    background-color: hsl(120, 65%, 85%);
 }
 
 .failure {
-    background-color: red;
+    background-color: hsl(0, 65%, 85%);
 }
 
 .incomplete {
-    background-color: yellow;
+    background-color: hsl(60, 65%, 85%);
+}
+
+td {
+    border: none;
+    padding: 0.3em 0.1em;
 }
 
 .missing {
@@ -40,7 +48,7 @@ body {
 
 .summary, .result {
     color: blue;
-    border: solid #CCCCCC 1px;
+    border: solid #ddd 1px;
     margin: 0.2em;
     padding: 0.2em;
 }
